@@ -1,6 +1,8 @@
 # VS-004 technical review — Decision loop and ranked dispatch
 
 **Status: Review recommendations only; not approved for implementation.**
+
+**Updated after owner review (2026-11-10):** ADR-026 establishes that scientific impact is a fallible, contextual assessment, not an objectively computable number. ADR-027 prefers reusing one recommendation for multiple claims with selective, cost-aware replanning. Earlier one-claim and global-staleness choices are **historical alternatives**, not requirements. All precise interfaces and VS-004 implementation still need review.
 Prepared 2026-11-10 against `main` commit
 `12af093a7feabc3c49613cf38d6f4935eba72b23` and the latest
 [proposal](VS-004-proposal.md). The companion [implementation draft](VS-004.md)
@@ -20,8 +22,8 @@ dispatch one admitted task on explicit invocation, then capture new feedback. A 
 | --- | --- | --- |
 | Research Context Builder | One trusted snapshot function with a selected graph view, complete execution snapshot and completeness manifest | Reads research state; writes only its decision snapshot |
 | Candidate Manager | Versioned records and a deterministic candidate source function | Supplies possible actions; cannot add executable tasks or bind them by free text |
-| Impact / Cost Predictor | Pure, versioned function over captured inputs and candidate versions | Produces predictions with units, assumptions and unknowns; cannot write Evidence |
-| Allocation Policy | Replaceable pure function over estimates, context qualifications and explicit constraints | Produces ranks, exclusions and abstention; receives no Store or executor |
+| Scientific impact assessment / Cost Estimation | Reasoned, revisable scientific judgment (possibly qualitative, disputed or unknown) beside separate resource-cost estimation | No formula completely determines research impact; neither assessments nor proxies become Evidence |
+| Allocation and Replanning Policies | Rank from evidence-linked judgments, predictions and constraints; separately evaluate whether an existing recommendation still applies | Ranking and re-evaluation have explicit versioned reasons; neither policy receives executor, task admission or authorization capabilities |
 | Decision Ledger | Small trusted service with immutable records and request replay | Saves complete inputs/results; a trusted controller can automatically publish the manager's priority, but untrusted text cannot admit tasks or start execution |
 | Recommendation-Guided Scheduler | Separate controller operation and narrow transaction-owned ranked claim | Independently enumerates *all* admitted ready tasks, checks ranking/eligibility/capacity, and invokes only existing lifecycle |
 
@@ -98,13 +100,15 @@ ranked task; record its blocker IDs/statuses. All tasks stay subject to the fixe
 worker and single-active-run controls. A completed/failed/needs_review task is
 never retried by ranking.
 
-### Freshness and automatic recommendation publication
+### Recommendation validity, reuse and automatic publication
 
-Use the conservative proposed freshness pair `(graph_seq, execution_sha256)`, with study/charter, context version and trusted dispatch-profile hash. Capture graph and execution together. Any execution-state change or graph operation makes a decision stale for a new scheduling claim; ledger-only bookkeeping does not.
+**Preferred architecture (ADR-027):** A recommendation can remain the ranking basis for **multiple** distinct, separately authorized task claims. The original context hash identifies what was known at recommendation creation; it does not by itself decide whether a ranking is still useful. New evidence, task completion and graph changes require an auditable *relevance check*, not automatic complete re-ranking.
 
-**Accepted V4-13:** Research Manager determines and updates order automatically. The trusted controller validates the decision's inputs, policy identity and exact task mappings before recording its scheduling preference, without a separate human click on each round. Recommendation text cannot grant task admission, execution permissions, new workers or unattended job triggers.
+A separate versioned **Replanning Policy** records consulted premises, changed items, relevant uncertainties, estimated cost of another manager assessment and a reasoned decision to reuse, recompute, refuse or defer. No claim that scientific impact or replan value can be computed exactly. Unknown critical premises must cause conservative refusal or reassessment, not silent reuse.
 
-**Still open:** whether publication is atomic with decision saving or a separate trusted controller operation, and whether each published ranking is valid for only **one committed claim**. One-claim lifetime remains a reasonable narrow proposal: after a claim, a new manager decision can be produced automatically for the next explicit dispatch request. It must not require a human re-activation, and no multi-claim validity assumption is silently adopted.
+The trusted controller publishes manager priorities automatically without per-round operator activation (ADR-024), but publishing never triggers a worker. At dispatch, the scheduler verifies admission, all actual ready tasks, dependencies, worker restrictions and capacity regardless of whether an old rank was reused. Multiple immutable dispatch receipts may reference one ranking and distinct task/run IDs, each with a recorded reuse/replan check. A global graph/execution hash difference may signal change but **must not unconditionally expire** a rank. The earlier one-claim proposal is a rejected default, not an accepted constraint.
+
+**Open:** bounded read-set and relevance policy, partial context treatment, concurrency and cache invalidation, stale age/use-count limits, cost of re-evaluation, and how to record human/AI scientific disagreement. No approved precise schema/API yet.
 
 ### Atomic dispatch procedure
 
@@ -142,11 +146,11 @@ outside the existing reliability model.
 | --- | --- | --- |
 | V4-1 | One complete offline round plus real ranked claim and fixed-worker execution | Advisory-only omits the requested execution ordering; unattended autonomy broadens scope |
 | V4-2 | New versioned advisory identities with exact graph/proposal origins and optional verified stored-task bindings | Reusing proposal IDs confuses approval with valuation; requiring graph nodes creates unnecessary graph writes |
-| V4-3 | Separate contribution, information value, uncertainty and resource vector; preserve unknowns and units | Scalar reward loses resource semantics; full distributions are unnecessary for this deterministic fixture |
+| V4-3 | **ADR-026:** preserve reasoned, qualitative/uncertain/incomparable impact assessment separately from information proxies and cost vector | Do not require a universal numerical impact score; synthetic policy arithmetic is only a test fixture |
 | V4-4 | Static baseline and one deterministic information-aware function with explicit synthetic utility | UCB/Thompson/VOI need additional reward/posterior assumptions; no universal winner is selected |
 | V4-5 | Separate immutable context containing selected graph and exact execution component | Ephemeral inputs complicate replay; modifying plan export would change authorization hashes |
 | V4-6 | Explicit additive SQLite v4; six substantive tables, embedded estimate/configuration payloads | Sidecars complicate atomic claim/audit; stateless tests cannot preserve decision/dispatch history |
-| V4-7 | Explicit new round; a versioned fixture estimator actually recalculates estimates from revealed feedback | No live retraining, inferred real impact reward, event subscription or automatic provider recall |
+| V4-7 | **ADR-027 preferred:** retain recommendations for multiple claims when the Replanning Policy finds relevant premises still valid; explicitly record reuse/recompute/defer | Do not force full reevaluation after every run or ignore newly relevant evidence |
 | V4-8 | Trusted ledger and scheduling adapter around pure estimation/ranking | Manager receives no Store, approval, import, baseline-transition or executor capability |
 | V4-9 | Declare global portfolio partiality; allow complete selected views, exclude candidates missing required inputs/costs; truncation causes abstention in v1 | Failing every intentionally selected view is unusable; ignoring truncation/unknowns overstates knowledge |
 | V4-10 | Multi-round deterministic fixture, adverse cases, replay and real-worker plumbing, plus all legacy regressions | Synthetic improvement cannot establish calibrated predictions or effective real research allocation |
@@ -189,7 +193,7 @@ must resolve in the same study. Six substantive tables are sufficient:
 | `decision_decisions` | Decision/request ID and normalized request hash; context FK; estimator/policy names, versions, exact config and code-version identifiers; constraints; candidate-set hash; ranked/abstain result and reasons; actor/time; prior-decision link |
 | `decision_members` | Decision FK plus candidate-version FK; exact estimate payload and input/feedback refs; disposition/reasons; nullable priority group and total ordinal; optional verified task binding copied from that version |
 | `decision_selections` | Optional study-local automatic controller publication/selection sequence and expected predecessor; verified manager/policy provenance, decision FK, freshness token and receipt/time; no per-round human activation |
-| `decision_dispatches` | Request ID/full request binding; selection/decision refs where present; immutable claimed/nonexecuting outcome; chosen task/spec/run refs when claimed; scheduler/profile version; effective freshness, skipped entries and bounded eligibility audit |
+| `decision_dispatches` | Request ID/full request binding; reusable recommendation/decision refs and recorded applicability/replanning-check refs; immutable claimed/nonexecuting outcome; unique chosen run, task/spec refs, scheduling profile and eligibility audit |
 
 Do not create separate estimator/configuration/estimate tables until independently
 needed. Estimate payloads in `decision_members` retain their context, method,
@@ -209,7 +213,7 @@ profile; the exact decision input/configuration hashes remain immutable.
 Use composite FKs for decision/member/candidate and study/task references. Bind
 claimed task/run with the existing `(study_id, task_id, run_id)` key; constrain
 claimed rows to nonnull task/run and nonexecuting rows to null task/run. Require
-unique claimed run ID and a partial unique claimed activation ID. Validate typed
+unique claimed run ID, **without** a uniqueness constraint limiting each recommendation to one claim. Validate typed
 polymorphic graph references in the service, as VS-003 does. Guard all new tables
 against update/delete. Latest selection is a projection of the append-only
 selection sequence; consumed status is a projection of dispatch receipts.
