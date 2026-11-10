@@ -1,0 +1,9 @@
+{
+  "task_id": "demo-mean",
+  "study_id": "demo-mean-study",
+  "title": "Calculate example mean",
+  "description": "Run the approved fixed computation to verify the persistent execution path.",
+  "kind": "demo_mean",
+  "input": {"values": [2, 4, 6, 8]},
+  "dependencies": []
+}

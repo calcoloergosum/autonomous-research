@@ -1,0 +1,8 @@
+# FOR INTEGRATION TESTING ONLY — not the user's actual ultimate research question.
+study_id: demo-mean-study
+question: "What is the arithmetic mean of [2, 4, 6, 8]?"
+success_criteria:
+  - "The reported arithmetic mean is 5.0."
+  - "The calculation and measured resource consumption are reproducibly recorded."
+constraints:
+  - "Use only the built-in, side-effect-free local demo worker."
