@@ -287,7 +287,7 @@ After approval, a minimal VS-004 implementation would include:
 6. Explicit multi-round re-evaluation with changed input records, offline scenario tests and regression checks proving **zero changes to admission/approval/import, worker execution safety, dependencies or baseline transition authority**.
 7. A **narrow trusted ranked-dispatch path** that activates a versioned recommendation, rechecks ready tasks under the atomic claim boundary, selects the highest-ranked eligible admitted task, records the actual choice, and executes solely via the existing fixed worker. Compare its selections against the legacy FIFO baseline; do not replace the resource scheduler wholesale.
 
-What may be **deferred** from this slice even if useful longer-term: online LLM candidate creation; trained/calibrated real predictor; automatic updating of learned model parameters; live event subscriptions; cross-study learning; general budget exchange rates; stochastic posterior sampling; general POMDP/VOI planning; new human queue; resource scheduling; public CLI; UI/VS-005 dashboards.
+What may be **deferred** from this slice even if useful longer-term: online LLM candidate creation; trained/calibrated real predictor; automatic updating of learned model parameters; live event subscriptions; cross-study learning; general budget exchange rates; stochastic posterior sampling; general POMDP/VOI planning; new human queue; multi-resource capacity scheduling beyond the narrow ready-task selector; a general public Research Manager CLI; UI/VS-005 dashboards.
 
 **Important boundary question:** if the user instead wants a genuine empirically learning estimator as the *first* VS-004 goal, the fixture-only estimator plan may be too small. Such a change requires an explicit review of rewards, observations, training/validation splits and permitted spending; do not treat this proposal as approval for that broader scope.
 
@@ -295,7 +295,7 @@ What may be **deferred** from this slice even if useful longer-term: online LLM 
 
 | ID | Observable criterion |
 | --- | --- |
-| D1 — Objective and permissions | Decisions bind original study/charter hash; no path to mutate objective, graph interpretations, authorization, task statuses, imports or worker policy. |
+| D1 — Objective and permissions | Decisions bind original study/charter hash; no path to mutate objective, graph interpretations, authorization/import or worker policy. Only the separate trusted ranked-dispatch path may perform an ordinary authorized pending→running claim. |
 | D2 — Open portfolio | A finite context/decision set can gain new candidates later; provenance, duplicate IDs and revision semantics are controlled; no fixed global arm count. |
 | D3 — Context fidelity | Exact graph and execution references; snapshots or equivalent saved canonical inputs; intentional omissions/truncation/unknown status explicit; VS-002 export v1 unchanged. |
 | D4 — Predictions | Estimated contribution, information value and resource-vector cost are distinguishable, with uncertainty/missing values; no prediction is inserted into Evidence or labeled validated. |
@@ -307,10 +307,9 @@ What may be **deferred** from this slice even if useful longer-term: online LLM 
 | D10 — Reliability | Concurrent duplicate/competing decisions, activation conflicts, ranked claims, interrupted writes and restart are tested for atomicity, idempotency and no silent recomputation of uncertain results. Two claimers cannot take one task; the dispatch receipt binds actual task/run identity. |
 | D11 — Offline scenario | Multi-round branching/information update, misleading estimates, cost surprises, an ineligible candidate, blocked high-ranked task, truncated context, abstention, explicit scheduling fallback behavior and adverse-policy counterexample all tested deterministically. |
 | D12 — Compatibility | Whole VS-001/002/003 regression suite and existing offline demos continue; any approved migration is explicit, rollback-safe, and preserves all legacy bytes/hash/IDs. Legacy FIFO interfaces on v1–v3 are unaffected; new v4 dispatch/API semantics are reviewed explicitly. |
+| D13 — Ranked dispatch | Given two or more already-admitted ready tasks with ranking opposite to FIFO, an explicit new dispatch call executes the highest-ranked eligible task using the original worker and records the choice. Blocked, failed, absent, stale, wrong-study, unapproved and speculative candidates cannot be claimed via ranking. Absent/stale/partial-ranking behavior follows a reviewed explicit rule, never an undocumented fallback. |
 
 Tests must verify **behavior**, not merely the number of cases. A synthetic policy comparison is an engineering sanity check; report its failures too. Do not promise scientifically optimal research allocation or production-ready calibration.
-
-| D13 — Ranked dispatch | Given two or more already-admitted ready tasks with ranking opposite to FIFO, an explicit new dispatch call executes the highest-ranked eligible task using the original worker and records the choice. Blocked, failed, absent, stale, wrong-study, unapproved and speculative candidates cannot be claimed via ranking. Absent/stale/partial-ranking behavior follows a reviewed explicit rule, never an undocumented fallback. |
 
 ## 14. Risks, debt, and future VS-005 boundary
 
@@ -343,13 +342,12 @@ The following are **choices for discussion**, not accepted ADRs or instructions 
 | V4-8 | What is the interface/authority? | Internal research decision manager + advisory ledger + **trusted scheduling adapter**; authorization/import remains separate | Direct model-to-dispatch authority (unsafe); graph-bound executable proposal/automation (requires new approval contract) |
 | V4-9 | How to handle partial contexts/unknown costs? | Explicit omissions; allow qualified comparison or abstain under a declared policy, no silent imputations | Strict fail on every partial input (simpler but less useful); silently ignore missing data (unsafe) |
 | V4-10 | What constitutes convincing validation? | Deterministic multi-round synthetic benchmarks with counterexamples plus preservation of old tests | Claims of real scientific effectiveness from fixture metrics (reject) |
-
 | V4-11 | Which task dispatch interface is authorized? | Ranked dispatch available only on v4 after explicit activation, with original v1–v3 `run-next` behavior preserved | Changing existing `run-next` default across all schemas would break compatibility; a separate command/flag adds an interface |
 | V4-12 | What happens with no usable ranking, blocked/ranked tasks, or abstention? | Strict non-execution when no valid ranking; skip blocked candidates; no silent FIFO fallback | Hybrid FIFO tail/fallback aids liveness but can undermine recommendation order; explicit operator override is another option |
 | V4-13 | Who may activate a recommendation for scheduling? | Trusted local operator/controller only, append-only activation and dispatch audit | Immediate auto-activation by an untrusted manager would weaken execution sequencing authority |
 
-Before approval, decide which aspects of *candidate proposal generation*, *predictor update* and *policy comparison* must be real algorithms versus deliberately simple synthetic seams. **Also settle V4-11–V4-13 explicitly because changing dispatch ordering affects public behavior, execution authority and liveness.** The goal is to exercise one complete advisory feedback loop without prematurely making the system's research policy a hard-coded architectural fact.
+Before approval, decide which aspects of *candidate proposal generation*, *predictor update* and *policy comparison* must be real algorithms versus deliberately simple synthetic seams. **Also settle V4-11–V4-13 explicitly because changing dispatch ordering affects public behavior, execution authority and liveness.** The goal is to exercise one complete recommendation-to-authorized-dispatch-and-feedback loop without prematurely making the system's research policy a hard-coded architectural fact.
 
 ### Suggested next step
 
-Review V4-1–V4-10 with the human owner. Then turn approved choices into explicit ADRs and a **smaller normative** `tasks/VS-004.md` plus internal interface contract, and only then instruct Codex to implement. The present proposal must **not** be treated as authorization for implementation. The owner's new scheduling direction is recorded here, but the exact API, stale-ranking policy, fallback and activation authority still require review.
+Review V4-1–V4-13 with the human owner. Then turn approved choices into explicit ADRs and a **smaller normative** `tasks/VS-004.md` plus internal interface contract, and only then instruct Codex to implement. The present proposal must **not** be treated as authorization for implementation. The owner's new scheduling direction is recorded here, but the exact API, stale-ranking policy, fallback and activation authority still require review.
