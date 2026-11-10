@@ -1,6 +1,8 @@
 # VS-004 proposal — Research Decision Loop with recommendation-guided scheduling
 
 **Status: Proposed; not approved for implementation.** Prepared 2026-11-10 against `main` after VS-003.
+
+**Updated design principles (2026-11-10):** Research impact cannot be fully computed or reduced to a universal objective score (ADR-026). Favor reusable recommendations across multiple claims, with selective, cost-aware replanning rather than unconditional recomputation after every execution (ADR-027). These constrain later implementation choices without approving a specific predictor, freshness algorithm or v4 schema.
 **Authority:** Design proposal only. It does not authorize schema migration, code changes, substantive research, network/model calls, generated-code execution, expenditure, or VS-005 implementation. **The owner has accepted recommendation-ordered execution, automatic Research Manager priority decisions (V4-13 / ADR-024) and independent verification of all ready work without FIFO fallback (V4-12 / ADR-025).** This does **not** authorize bypassing task registration/approval, triggering an unattended run, or implementing the unapproved scheduler contract. Human review of the new claim/dispatch semantics and decisions in section 15 is required before implementation.
 
 ## 1. Purpose and guiding question
@@ -15,7 +17,7 @@ Accepted project principles:
 
 1. The study charter's ultimate question, success criteria, constraints and permissions are immutable and human-owned.
 2. Candidate research directions are open-ended; only a bounded subset is evaluated in each decision.
-3. Expected impact, expected evidence acquisition cost and uncertainty are **predictions**, not observations or validated scientific results.
+3. Research impact is **a fallible, contextual scientific judgment**, not an objectively computable quantity. Approximate predictions (including qualitative/unknown assessments), observed evidence, and resource costs remain distinct; no mandatory universal impact score exists.
 4. Exploration has value because information can change subsequent decisions; exploitation has value because some actions seem more immediately useful. Neither is an absolute priority.
 5. A Research Manager recommends/value-estimates actions and orders *authorized task candidates*; an independent authority still admits executable work; a trusted scheduler selects only already-admitted, runnable work subject to dependencies and capacity.
 6. Subsequent discoveries can revise subordinate hypotheses, action priorities and baselines, but cannot rewrite previously observed evidence or the charter.
@@ -48,7 +50,7 @@ Separate five conceptual responsibilities. They can be small modules rather than
 
 1. **Decision context builder (trusted, read-only):** selects an objective-bound graph subgraph, pinned revisions and relevant observations, with completeness/frontier metadata and an exact snapshot identity.
 2. **Candidate source:** supplies distinct possible research actions, with origin and target references. The first implementation may use deterministic offline fixtures and persisted existing proposal/graph records; a live model generator is not required.
-3. **Estimator:** predicts effects and costs of each *candidate action*, recording uncertainty, assumptions, information provenance, estimator version and any unknown quantities.
+3. **Impact assessment and cost estimation:** document a fallible, possibly qualitative scientific evaluation of each candidate's relevance, possible consequences and uncertainties, alongside separately modeled resource-cost estimates. Numerical heuristics are optional aids and never the authority for scientific truth.
 4. **Allocation policy:** filters unsupported candidates, compares alternatives using a declared policy and scenario constraints, then emits a ranked recommendation (or explicit abstention) with reproducible reasoning. A trusted decision ledger stores the attempt.
 5. **Trusted dispatch selector:** binds a selected, fresh recommendation to an actual set of **existing, authorized, pending and dependency-ready** task IDs; revalidates eligibility and capacity under the scheduler's atomic claim transaction; dispatches one selected task using the existing worker path. The decision policy never gets a database task-claim or execution capability.
 
@@ -66,7 +68,7 @@ Immutable study charter
     Candidate supply (bounded set)
                  |
                  v
- Impact / evidence-value / cost predictions
+ Reasoned impact assessments / evidence information / cost estimates
                  |
                  v
   Explicit policy -> ranked recommendation / abstain
@@ -117,20 +119,30 @@ Repeated proposals of similar scientific content must not be silently deduplicat
 
 ## 5. What is predicted? Impact, information and cost
 
-A single scalar “importance” score is not a scientific primitive. At minimum, keep the following distinct.
+**The impact of an open-ended research action cannot be completely determined by computation.** Importance depends on scientific framing, novel possibilities, latent consequences, missing evidence and human-defined goals. No finite scoring formula can serve as an authoritative definition of scientific value. A computational heuristic or LLM evaluation may help *inform* a provisional judgment but must not be conflated with ground truth. At minimum, keep the following distinct.
 
 | Dimension | Meaning | Example limitations |
 | --- | --- | --- |
-| **Expected research contribution** | Predicted change in useful progress toward *unchanged charter criteria* if an action succeeds | No universally meaningful normalized progress percentage; often only ordinal or scenario-specific proxy |
+| **Research impact assessment** | A reasoned, revisable judgment about possible contributions to unchanged human-owned charter criteria; may be qualitative, contested or unknown | No uniquely computable impact, universal scalar or guaranteed mapping from experimental success to significance; record alternatives, rationale and disagreement |
 | **Probability / uncertainty** | Uncertain outcome quality, estimated success likelihood or interval/distribution | Unknown is not zero; an LLM's confidence is not calibrated probability |
 | **Expected information value** | Potential to discriminate hypotheses, reduce uncertainty or change future allocation | Information gain is not automatically aligned with final success; repeated correlated tests may be redundant |
 | **Resource demand** | Expected required LLM tokens, CPU/GPU seconds, human minutes, elapsed time, money, etc. **as a vector** | Never silently convert dimensions to one score without an approved exchange/constraint policy |
 | **Feasibility and reversibility** | Dependencies, available worker type, constraints, evidence/data prerequisites, permission state | “Advisable” is not “authorized to execute” |
 | **Opportunity cost / downstream effects** | Effects on other open directions, baseline applicability and possible future follow-ups | Can be speculative and must retain stated assumptions |
 
-An estimate record should bind: candidate version, study/charter hash, context ID/hash, exact evidence/graph revision references, method/model and version, estimated distribution or interval with units, calibration provenance if available, unknown-field indicators, and separate assumptions. Record estimates as **claims/predictions about candidates**, not as new Evidence rows or as formally reviewed scientific facts.
+An assessment record should bind candidate version, study/charter hash, context ID/hash, exact evidence/graph revision references, **author/evaluator and method/version**, scientific reasoning and assumptions, alternative interpretations, scope, uncertainty, and whether its outputs are qualitative, numerical proxy or unknown. Resource-cost predictions must carry separate units/distributions/missingness and calibration provenance if available. A numeric research-impact proxy is optional, not required for every candidate or an empirical truth label. Record estimates as **claims/predictions about candidates**, not as new Evidence rows or as formally reviewed scientific facts.
 
-Do not force numerical probabilities when the source supports only qualitative ranking or an `unknown` value. Different uncertainty classes (epistemic, noisy observation, missing data) may need distinct treatment; compare the minimal representation required for a decision with more elaborate distribution models.
+Do not force a numerical research-impact score, probability or total ordering when the evidence supports only a partial/qualitative comparison or `unknown`. The manager may report incomparability, contested priority or reasoned defer. Different uncertainty classes (epistemic, noisy observation, missing data) may need distinct treatment; compare the minimal representation required for a decision with more elaborate distribution models.
+
+### 5.1 Judgment and computation play different roles
+
+The Research Manager should combine provisional **scientific judgment** (why a direction might matter, what could falsify it, which assumptions are untested) with computable **constraints and accounting** (task readiness, available resource units, observed costs and versioned policy rules). Arithmetic on explicit scenario proxies can assist comparison, but cannot fully determine a scientific claim's eventual importance.
+
+- Preserve descriptive scientific rationale and evidence links even when no calibrated numerical impact estimate exists.
+- Preserve incomparability or disagreement. A policy may apply a disclosed tie-break or seek new evidence rather than fabricate a precise impact number.
+- Explain exploration versus exploitation with scientific reasons and possible information gain; a score alone is not an explanation.
+- Allow human scientific judgment to challenge subordinate assessments without changing charter/evidence; formal scientific certification remains deferred.
+- Synthetic oracle rewards test software behavior only; they do not define real research impact.
 
 ### Calibration and attribution limits
 
@@ -151,7 +163,7 @@ Compare several candidate decision policies.
 | Value of information / approximate lookahead | Represents learning as changing future choices | Expensive and sensitive to unverified world model and the choice of terminal utility |
 | Pareto/constrained choice + explicit exploration rule | Retains heterogeneous resources and transparent constraints | Does not produce a unique answer without priorities or tie-breaking rules |
 
-**Tentative minimal recommendation:** implement only a **policy seam** and two deterministic offline reference policies: (a) a non-adaptive baseline such as fixed ranking/FIFO and (b) a simple, explicitly parameterized information-aware policy. The second must use an artificial scenario utility, conservative feasibility filters and inspectable tie-breaking. It is a test mechanism, **not** a validated Research Manager algorithm. The proposal should not predetermine a universal equation `impact/cost`, a fixed exploration percentage, an optimal bandit algorithm, or fixed resource exchange rates.
+**Tentative minimal recommendation:** provide a replaceable decision-policy seam and two offline reference policies: (a) a non-adaptive ordering baseline and (b) a transparent information-aware comparator on **synthetic scenario-specific utility**, with conservative feasibility filtering and inspectable tie-breaking. This numeric proxy is solely an engineering test mechanism; the architecture must accept fallible, qualitative or incomparable real scientific-impact judgments without coerced scores. Neither reference policy is validated as a generally useful Research Manager. The proposal should not predetermine a universal equation `impact/cost`, a fixed exploration percentage, an optimal bandit algorithm, or fixed resource exchange rates.
 
 The policy must be able to **abstain** and must explain why a high predicted value was not selected (e.g. unknown required resource, disallowed action, uncertain evidence basis or strict constraint). The **existing** execution controller remains authoritative for real task eligibility and safe claims. Decision-stage feasibility checks are predictions, not permission grants or capacity reservations. Ranking must not allow speculative candidates to leap ahead by becoming executable automatically.
 
@@ -191,7 +203,7 @@ A decision record needs:
 
 Prefer a normalized record that is sufficient to recompute the recommendation from saved inputs without needing the current graph or model network access. If offline estimate values are fixture supplied, store the exact synthetic fixture version and seed. An AI-generated rationale is data, not execution authority.
 
-**Re-evaluation:** a new graph revision, new evidence, revised interpretation, changed cost observation, candidate arrival or changed policy can prompt a new decision. Preserve old estimates and decisions. A new decision can reference which prior assumptions changed, but do not claim that sequential recommendation changes prove a beneficial causal effect. No continuous background loop or scheduled watcher is required in VS-004; explicit local calls suffice.
+**Re-evaluation:** new graph revisions, evidence, interpretations, cost surprises, candidate arrivals and policy changes are reasons to **check whether replanning is worthwhile**, not unconditional triggers for a full new ranking. A separately versioned Replanning Policy considers a decision's consulted premises, potentially changed priorities, uncertainty and estimated evaluation cost. It can recommend reuse, replan, or defer/refuse with traceable rationale. Record these checks separately from full Research Manager evaluations; do not claim a precise VOI estimate is achievable. Preserve original recommendations and judgments. No automatic background watcher is required.
 
 **Crash behavior:** prepare inputs and persist a request before invoking any uncertain external provider in future; uncertain results require explicit review rather than hidden replays. For the first purely local deterministic policy, an atomic decision/result/receipt transaction and repeatable tests are enough. Do not introduce network calls or indefinite jobs.
 
