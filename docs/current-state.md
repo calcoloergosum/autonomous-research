@@ -1,3 +1,13 @@
+# Current state — VS-005 specification confirmed, not implemented (2026-11-10)
+
+**Design decision only; no VS-005 source code or new tests have been run as a result of this update.** The human owner confirmed a **read-only, automatically refreshing local Research Observatory** with **React + Vite + strict TypeScript**, focused on **one Task/Dispatch → Why? → Evidence → stored Decision Context → later Decision comparison** journey. The normative engineering specification is [`tasks/VS-005.md`](../tasks/VS-005.md), the bounded HTTP/temporal contract is [`docs/interfaces-vs005.md`](interfaces-vs005.md), the accepted directions are **ADR-031 through ADR-034** in [`docs/decisions.md`](decisions.md), and the separate Codex instructions are [`prompts/codex-vs005.md`](../prompts/codex-vs005.md). The broader [`tasks/VS-005-proposal.md`](../tasks/VS-005-proposal.md) explains tradeoffs but is not an expanded implementation mandate.
+
+**Boundaries:** observer uses a dedicated SQLite read-only connection; no migrations, execution, approvals, study charter modification, remote hosting, new research policy, additional Graph semantics or new DB schema. The first API has five GET-only reads: `meta`, `overview`, `trace`, `checkpoint`, `changes`. Saved Decision Context is labeled as original captured input; Graph as-of does not reconstruct historical task status. Polling is an initial 3-second local design choice, not scientific progress detection.
+
+**Pre-existing verified baseline unchanged:** the VS-004 follow-up at `48d2412f26497f500e9de75514add8a78da9c6f3` reports 561 tests passing; that **does not** mean the new VS-005 UI/backend exists or has passed tests. P2 partial-ranking execution behavior remains unimplemented, outside VS-005 scope.
+
+---
+
 # Current state — ADR-030 initial-ranking follow-up verified offline
 
 **As of 2026-11-10:** The approved
