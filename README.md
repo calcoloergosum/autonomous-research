@@ -1,6 +1,6 @@
 # Autonomous Research Framework (ARF)
 
-**Status:** VS-001 and offline VS-002 implemented and verified locally on 2026-11-10. Planning uses a deterministic fixture mock, explicit local operator decisions, and a separate task import. The CLI executes only the built-in deterministic demo worker. Autonomous research remains future work.
+**Status:** VS-001, offline VS-002, and the bounded VS-003 Research Graph are implemented locally. The graph records unreviewed assertions and scoped operator baseline transitions through an internal service. Planning uses a deterministic fixture mock, explicit local operator decisions, and a separate task import. Only the built-in deterministic demo worker executes; autonomous research remains future work.
 
 ARF is a future system for autonomously managing a potentially unbounded portfolio of research tasks to answer a *human-defined* ultimate research question. It will learn estimates of impact and evidence-acquisition cost, balance exploration and exploitation, schedule limited LLM/compute/human resources, and revise intermediate research baselines without changing the ultimate question.
 
@@ -126,6 +126,30 @@ recall the provider automatically. Planning limits are 1 MiB context, 64 KiB raw
 response, 4 KiB text fields, 64 dependencies/references and depth 32. No evidence
 is silently dropped. See the [full contract](docs/interfaces-vs002.md).
 
+## Offline research graph fixture (VS-003)
+
+The internal graph contract is [interfaces-vs003](docs/interfaces-vs003.md).
+There are no new public graph CLI commands. This fixture harness requires a fresh
+path, runs two approved demo calculations, and leaves one explicitly imported task
+pending. It verifies populated v2→v3 migration, branching/competing assertions,
+joint synthesis, scoped baseline transition, append-only corrections/history,
+bounded reads, and unchanged legacy rows/context. All interpretation is synthetic
+and unreviewed; observations remain unvalidated.
+
+```bash
+source .venv/bin/activate
+mkdir -p .local
+graph_demo_dir=$(mktemp -d .local/vs003.XXXXXX)
+python -m arf.graph_demo --db "$graph_demo_dir/arf.db" > "$graph_demo_dir/result.json"
+python -m arf.graph_demo --inspect --db "$graph_demo_dir/arf.db"
+```
+
+For an existing v2 database, migration is an explicit internal
+`arf.graph_store.migrate(store)` call. Existing `init` still creates v1, and
+`plan migrate` still provides only the v1→v2 upgrade. On v3 its unchanged v2
+compatibility response never downgrades the database. Graph-only changes do not
+change VS-002 export bytes/hashes or execution authorization/freshness.
+
 ## Recovery and explicit retry
 
 An interrupted controller leaves its committed attempt `running`. After confirming the previous controller has stopped:
@@ -147,7 +171,7 @@ POSIX advisory locking serializes `run-next` and `recover` on one host; SQLite t
 
 ## Status and work ownership
 
-- This package: VS-001 execution and VS-002 offline planning/authorization/import are implemented. See current-state for observed verification results.
+- This package: VS-001 execution, VS-002 offline planning/authorization/import, and VS-003 internal research graph are implemented. See current-state for observed verification results.
 - VS-002 implements the approved [task](tasks/VS-002.md) and ADR-012–015. No real research study, live LLM integration, automatic approval, or advanced scheduler is implemented or authorized.
 - Human + ChatGPT: review deviations, decide on public/data interface changes and future milestones.
 
