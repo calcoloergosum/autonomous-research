@@ -1,8 +1,8 @@
 # VS-002 proposal — Planner proposals at the persistent task boundary
 
-**Status:** Proposal requiring human review; not an approved implementation specification.
+**Status:** Reviewed; architectural alternatives B / B / A / A selected by the human owner on 2026-11-10. Historical design proposal; approved implementation contract is `tasks/VS-002.md`.
 
-**Precondition:** VS-001 is completed. Approval of this document's selected options and interfaces is required before VS-002 implementation.
+**Precondition:** VS-001 is completed. Approved choices are recorded as ADR-012–015 in `docs/decisions.md`. Remaining implementation details are bounded by `tasks/VS-002.md`; the historical alternatives below are retained for traceability.
 
 **Authority:** This document authorizes no research, provider calls, spending, schema migration, or code execution. Examples refer only to the existing integration fixture.
 
