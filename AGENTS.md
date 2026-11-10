@@ -13,7 +13,7 @@ This is a research systems engineering repository. Before implementation, read `
 
 ## Current implementation scope
 
-- Implement `tasks/VS-001.md` only; defer other roadmap work.
+- Work only on the explicitly assigned milestone/task and within its authorized scope; defer other roadmap work. A proposal assignment authorizes design only, not implementation.
 - Python 3.11+ and SQLite; keep external dependencies minimal. PyYAML for charter parsing and pytest for tests are acceptable. No large agent/orchestration framework in VS-001.
 - Favor explicit, testable modules and small, typed functions. Keep storage, execution, and policy interfaces separate so they can evolve later.
 - Preserve evidence and run history; do not mutate or delete observations to make a test pass.
@@ -23,7 +23,7 @@ This is a research systems engineering repository. Before implementation, read `
 
 - Check repository state before modifying files. Do not overwrite pre-existing user code or unrelated local changes.
 - When an implementation detail is underspecified, choose the smallest reversible option, state the assumption in `docs/current-state.md`, and add a test when meaningful. If a choice changes the public CLI, persistent schema meaning, ownership, or safety boundary, stop and present the alternatives instead of guessing.
-- Source-of-truth priority: human-approved study charter / latest human instructions > `tasks/VS-001.md` and `docs/interfaces.md` > architecture and decisions > implementation details.
+- Source-of-truth priority: human-approved study charter / latest human instructions > explicitly assigned task and `docs/interfaces.md` > architecture and decisions > implementation details. A proposal is not an approved implementation task.
 - After coding, run `python -m pytest -q`, a documented end-to-end demo, and `git diff --check` where Git is available. Report results truthfully.
 - Update `docs/current-state.md` with implemented features, verified commands, test results, and limitations. Do not claim success before tests actually pass.
 - Never modify a study charter as part of an automated research operation. Demonstration fixtures are maintainable by developers; a recorded study charter is immutable once imported.

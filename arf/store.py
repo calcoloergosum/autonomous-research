@@ -293,7 +293,7 @@ class Store:
             status = "succeeded" if result is not None else "failed"
             if result is not None:
                 task = self.task(run["task_id"])
-                validate_result(result, len(task["input"]["values"]))
+                validate_result(result, task["input"])
                 if error is not None or exit_code != 0:
                     raise ARFError("successful result requires exit code zero and no error")
             elif not error:

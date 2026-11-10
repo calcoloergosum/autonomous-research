@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
+import math
 import sqlite3
 import subprocess
 import sys
@@ -142,6 +143,44 @@ def test_a5_invalid_output_and_exit_failure(ready, worker):
     assert run["status"] == "failed" and run["result"] is None and run["error"]
     assert run["cost"]["wall_seconds"] >= 0
     assert len(run["stdout"]) <= 4096
+    assert ready.evidence() == []
+
+
+@pytest.mark.parametrize("mean", [100.0, math.nextafter(5.0, math.inf)])
+def test_demo_wrong_well_formed_mean_fails_without_evidence(ready, mean):
+    output = run_next(ready, lambda _: WorkerOutput(f'{{"mean": {mean}, "count": 4}}', "", 0))
+    assert output["status"] == "failed"
+    assert ready.task("demo-mean")["status"] == "failed"
+    run = ready.task("demo-mean")["runs"][0]
+    assert run["status"] == "failed" and run["result"] is None
+    assert run["error"] == "demo_mean worker mean does not match input"
+    assert run["exit_code"] == 0
+    assert ready.evidence() == []
+
+
+@pytest.mark.parametrize(("values", "mean"), [
+    ([2, 4, 6, 8], 5.0),
+    ([1e308, 1.0, -1e308], 1.0 / 3.0),
+    ([5e-324, 5e-324], 5e-324),
+    ([1e308, -1e308], 0.0),
+])
+def test_demo_correct_mean_and_numerical_edges(store, values, mean):
+    store.add_task(TaskSpec.parse(spec(input={"values": values})))
+    output = run_next(store)
+    assert output["status"] == "succeeded"
+    assert output["run"]["result"] == {"mean": mean, "count": len(values)}
+    evidence = store.evidence()
+    assert len(evidence) == 1
+    assert evidence[0]["result"] == output["run"]["result"]
+    assert evidence[0]["validation_status"] == "unvalidated"
+
+
+def test_demo_finalization_rechecks_mean_against_persisted_input(ready):
+    claim = ready.claim_next()
+    with pytest.raises(ARFError, match="demo_mean worker mean does not match input"):
+        ready.finish_run(claim["run_id"], result={"mean": 100.0, "count": 4}, error=None,
+                         exit_code=0, stdout="", stderr="", wall_seconds=0)
+    assert ready.task("demo-mean")["runs"][0]["status"] == "running"
     assert ready.evidence() == []
 
 

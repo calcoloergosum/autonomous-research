@@ -54,7 +54,7 @@ def run_next(store: Store, executor: Callable[[dict], WorkerOutput] = execute_de
                 raise ARFError("worker output exceeds limit")
             if exit_code != 0:
                 raise ARFError(f"demo worker exited with code {exit_code}")
-            result = validate_result(parse_json(output.stdout), len(task["input"]["values"]))
+            result = validate_result(parse_json(output.stdout), task["input"])
         except Exception as exc:
             # Never turn a controller interruption (BaseException) into a completed run.
             error = bounded_text(str(exc)) if isinstance(exc, ARFError) else f"executor error: {type(exc).__name__}"

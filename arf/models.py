@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 import json
 import math
+import statistics
 from typing import Any
 
 import yaml
@@ -46,13 +47,20 @@ def validate_input(value: Any) -> dict[str, Any]:
     return value
 
 
-def validate_result(value: Any, count: int) -> dict[str, Any]:
+def validate_result(value: Any, input_data: dict[str, Any]) -> dict[str, Any]:
+    """Check the fixed demo calculation, without validating research evidence."""
+    values = validate_input(input_data)["values"]
     if not isinstance(value, dict) or set(value) != {"mean", "count"}:
         raise ARFError("worker result must contain only mean and count")
     if not finite_number(value["mean"]):
         raise ARFError("worker mean must be finite")
-    if type(value["count"]) is not int or value["count"] != count:
+    if type(value["count"]) is not int or value["count"] != len(values):
         raise ARFError("worker count does not match input")
+    # Match worker.py in the same runtime: exact numeric equality after JSON
+    # round-trip, with no tolerance that could accept a forged nearby value.
+    # statistics.mean avoids intermediate-sum overflow for finite extremes.
+    if value["mean"] != float(statistics.mean(values)):
+        raise ARFError("demo_mean worker mean does not match input")
     return value
 
 

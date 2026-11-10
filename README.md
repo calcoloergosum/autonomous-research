@@ -89,7 +89,7 @@ POSIX advisory locking serializes `run-next` and `recover` on one host; SQLite t
 ## Status and work ownership
 
 - This package: VS-001 source, CLI, persistence, fixed worker, and automated acceptance tests are implemented. See current-state for the observed test count and verification details.
-- Scope remains **only** VS-001. No real research study, autonomous planner, LLM integration, or advanced scheduler is implemented or authorized.
+- VS-001 is completed. [VS-002](tasks/VS-002-proposal.md) is a proposal requiring human review before implementation. No real research study, autonomous planner, LLM integration, or advanced scheduler is implemented or authorized.
 - Human + ChatGPT: review deviations, decide on public/data interface changes and future milestones.
 
 See [`docs/current-state.md`](docs/current-state.md) for the precise handoff status.

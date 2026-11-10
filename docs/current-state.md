@@ -1,6 +1,53 @@
-# Current state — VS-001 implemented
+# Current state — VS-001 completed; VS-002 proposed
 
 **As of 2026-11-10:** The fixed local execution slice is implemented and exercised. This demonstrates persistence and recovery; it is not a research result or an autonomous research system. No human study question has been supplied; the demo charter remains a fixture. No study charter or example fixture was edited.
+
+## VS-001 review closeout (2026-11-10)
+
+Both review findings were present at the start of this follow-up. The worktree had three unrelated untracked files: `START_HERE_KO.md`, `WORKFLOW.md`, and `docs/roadmap.md`. They were left untouched; tracked files had no pre-existing changes. The earlier implementation/verification record below is retained as historical context.
+
+- `arf/models.py` now compares the returned demo mean with `float(statistics.mean(original_input_values))`, after finite-value, field and count checks. `arf/service.py` and `arf/store.py` pass the original validated/persisted input to this internal validator. Previously, a well-formed mean of `100.0` for `[2,4,6,8]` was accepted and produced evidence; it now records a failed run with no result/evidence through `run-next`. Finalization also rechecks against persisted input; direct invalid finalization rolls back and leaves the active attempt for explicit recovery.
+- Exact numeric equality is intentional for this fixed worker in the same Python runtime: it repeats the worker's `float(statistics.mean(...))` calculation, and JSON preserves that float. No approximate tolerance admits a nearby wrong value; numeric equality treats signed zero equally. `statistics.mean` avoids intermediate-sum overflow, retaining `[1e308,1e308] -> 1e308`. This is a demo correctness check, not a general scientific validator; successful observations remain `unvalidated`.
+- Seven regression cases in `tests/test_lifecycle.py` cover forged `100.0`, the adjacent float above `5.0`, correct fixture output, cancellation with retained small residual, subnormals, zero from extreme cancellation, and the persisted-input finalization guard. Existing tests, including the extreme positive pair, remain intact.
+- `AGENTS.md` now authorizes only the explicitly assigned task/milestone, distinguishes proposals from implementation authority, and generalizes task priority accordingly. `tasks/VS-001.md` is Completed; its acceptance criteria are unchanged. README's ownership/status bullet links to the new proposal.
+- `tasks/VS-002-proposal.md` is design only and requires human review. It specifies context/proposal/authorization boundaries, a mock-only provider path, research notes outside executable tasks, validation and deduplication, and storage/interface alternatives. No VS-002 modules, dependencies, schema changes, new CLI commands, live model calls, or research runs were introduced.
+
+### Closeout verification observed
+
+Used the existing offline virtual environment (`source .venv/bin/activate`); no package installation or network access was needed. Observed versions: Python 3.12.3, SQLite 3.45.1, PyYAML 6.0.1, pytest 9.1.1. The original PATH still lacks `python`; activating the existing environment supplies it. The earlier ensurepip limitation below was not bypassed with a download.
+
+| Actual command (after environment activation) | Observed result |
+| --- | --- |
+| `python -m pytest -q` before edits | 67 passed in 2.45s |
+| `python -m pytest -q tests/test_lifecycle.py -k 'demo_wrong_well_formed_mean or demo_correct_mean_and_numerical_edges or demo_finalization_rechecks'` before source fix | 3 failed, 4 passed, 30 deselected; reproduced acceptance of forged means and missing persistence check |
+| Same focused command after source fix | 7 passed, 30 deselected in 0.16s |
+| `python -m pytest -q` after source/test changes | 74 passed in 2.78s |
+| `git diff --check` after documentation updates | Exit 0; no whitespace errors |
+| `git diff --no-index --check /dev/null tasks/VS-002-proposal.md` | No whitespace errors; exit 1 indicates the new file differs from `/dev/null` |
+
+The README demo was rerun in separate CLI processes with a fresh database, preserving the previous `.local/arf.db` and its observations:
+
+```bash
+source .venv/bin/activate
+demo_dir=$(mktemp -d .local/vs001-closeout.XXXXXX)
+demo_db="$demo_dir/arf.db"
+python -m arf init --db "$demo_db" --charter examples/demo-charter.yaml
+python -m arf task add --db "$demo_db" --spec examples/demo-task.json
+python -m arf task list --db "$demo_db"
+python -m arf run-next --db "$demo_db"
+python -m arf task show --db "$demo_db" --id demo-mean
+python -m arf evidence list --db "$demo_db"
+python -m arf recover --db "$demo_db"
+python -m arf run-next --db "$demo_db"
+```
+
+All eight CLI commands exited zero. Actual database: `.local/vs001-closeout.Ikwd69/arf.db`. Observed one successful run `5e1ab004-46e3-4b9d-9b00-b28c2a23e0c2`, result `{"mean":5.0,"count":4}`, one linked **unvalidated** evidence row, and measured wall time **0.02093435451388359 seconds**. Other recorded resource usage was zero, with CPU time `null`. Charter SHA-256 remained `d33806961b80d24f57c72792f9511f29432eb25533990db1aa1cd1ea77dd95e9`. Recovery found no interrupted attempts; the final `run-next` returned `no_ready_task` without duplication.
+
+### Remaining limits and next human decisions
+
+The correctness check deliberately duplicates the fixed worker's formula; changes to that formula require keeping controller validation aligned. It provides no independent scientific evidence assessment and does not retroactively reclassify historical observations. No new public task/CLI contract, database schema meaning, ownership, security or recovery behavior was introduced. Existing single-host trust, output/memory bounds and interrupted-process limitations below remain.
+
+Before VS-002 implementation, human review must select proposal persistence (artifact journal/reconciliation versus a transactional schema migration), public entry points (library harness versus explicit CLI), context freshness and deduplication semantics, the approval binding and local bounds, and whether to retain non-executable research notes or explicitly defer them. These alternatives are proposals, not accepted architectural decisions. No next milestone is approved by closing VS-001.
 
 ## Implemented files and behavior
 
@@ -13,9 +60,9 @@
 - `tests/`: automated acceptance, restart, validation, concurrency, failure and recovery coverage.
 - `README.md`: actual setup/demo commands, observed behavior, explicit retry semantics and execution limits.
 
-The working tree initially contained only untracked specification files, with no Git commits. Existing unrelated documents and fixtures were preserved. No Git commit, push, package download or network request was made.
+At the original implementation's start, the working tree contained only untracked specification files, with no Git commits. Existing unrelated documents and fixtures were preserved. No Git commit, push, package download or network request was made during that implementation or this closeout.
 
-## Verification observed
+## Original implementation verification observed
 
 Environment: Python 3.12.3, SQLite from the standard library, PyYAML 6.0.1, pytest 9.1.1. There was no `python` on the original PATH. `python3 -m venv .venv` failed because ensurepip is unavailable. The successful offline setup was:
 
@@ -78,4 +125,4 @@ The filesystem owner and installed Python/package code are trusted. SQL guards d
 
 The timeout and small output rely on the fixed audited worker. Capturing output is not a general memory sandbox for arbitrary programs. Import size, process memory and total database growth have no configurable quotas in this slice. A forced kill of the controller releases its advisory lock and can leave a child briefly running; that child cannot finalize the DB. Recovery treats its outcome and duration as unknown. The child is side-effect-free, and retry remains explicit; exactly-once execution, orphan-process supervision, distributed leases and full power-loss/storage-corruption recovery are not promised. Lock files must not be removed during operation. The crash test simulates interruption after the durable claim rather than asserting arbitrary machine power-loss behavior.
 
-Deferred human decisions remain unchanged: actual study question/evidence criteria, real budgets and permissions, impact/cost prediction, allocation policy, baseline revision, human working hours, LLM APIs, GPU scheduling and generated-code isolation. No later vertical slice is implemented here; select its scope only after human review of VS-001.
+Deferred human decisions remain unchanged: actual study question/evidence criteria, real budgets and permissions, impact/cost prediction, allocation policy, baseline revision, human working hours, LLM APIs, GPU scheduling and generated-code isolation. No later vertical slice is implemented here; review `tasks/VS-002-proposal.md` and approve its scope and choices before implementation.
