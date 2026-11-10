@@ -80,6 +80,16 @@ class GraphService:
                 'graph_seq': row['seq'], 'committed_at': row['committed_at'],
                 'actor': json.loads(row['actor']), 'result': json.loads(row['result'])}
 
+    def _require_revision_owner(self, creation_seq: int, actor: Actor) -> None:
+        """Ownership stays with the creator, including after operator corrections."""
+        row = self.db.execute('SELECT actor FROM graph_operations WHERE study_id=? AND seq=?',
+                              (self.study_id, creation_seq)).fetchone()
+        if row is None:
+            raise GraphError('schema', 'assertion creation provenance is missing')
+        owner = json.loads(row['actor'])['name']
+        if actor.role != 'operator' and actor.name != owner:
+            raise GraphError('unauthorized', 'only the original author or an operator may revise this assertion')
+
     def _mutate(self, kind: str, request: dict, operation_id: str, actor: Actor,
                 action: Callable, *, operator: bool = False) -> dict:
         attribution = self._actor(actor, operator=operator)
@@ -230,11 +240,12 @@ class GraphService:
         request = dict(idea_id=idea_id, expected_head=expected_head, text=text, assumptions=assumptions,
                        scope=scope, premises=[asdict(r) for r in premises], joint=joint)
         def write(seq):
-            row = self.db.execute('''SELECT i.kind,r.revision_id FROM graph_ideas i
+            row = self.db.execute('''SELECT i.kind,i.seq AS creation_seq,r.revision_id FROM graph_ideas i
                 JOIN graph_idea_revisions r USING(idea_id) WHERE idea_id=? ORDER BY r.seq DESC LIMIT 1''',
                                   (idea_id,)).fetchone()
             if not row:
                 raise GraphError('not_found', 'unknown idea')
+            self._require_revision_owner(row['creation_seq'], actor)
             if row['revision_id'] != expected_head:
                 raise GraphError('conflict', 'stale idea revision head')
             body = self._idea_body(row['kind'], text, assumptions, scope, premises, joint)
@@ -360,11 +371,12 @@ class GraphService:
         def write(seq):
             if type(withdraw) is not bool:
                 raise GraphError('invalid', 'withdraw must be boolean')
-            row = self.db.execute('''SELECT l.type,r.* FROM graph_links l
+            row = self.db.execute('''SELECT l.type,l.seq AS creation_seq,r.* FROM graph_links l
                 JOIN graph_link_revisions r USING(link_id) WHERE link_id=? ORDER BY r.seq DESC LIMIT 1''',
                                   (link_id,)).fetchone()
             if not row:
                 raise GraphError('not_found', 'unknown semantic link')
+            self._require_revision_owner(row['creation_seq'], actor)
             if row['revision_id'] != expected_head:
                 raise GraphError('conflict', 'stale link revision head')
             old = json.loads(row['body'])
@@ -409,8 +421,6 @@ class GraphService:
             text(scope, 'scope')
             text(rationale, 'rationale')
             refs = self._refs(motivations, 'EC')
-            if not refs:
-                raise GraphError('invalid', 'transition requires exact motivating evidence/claim')
             for baseline in (new_baseline, expected_prior):
                 if baseline is None:
                     continue
@@ -423,15 +433,18 @@ class GraphService:
                                       (self.study_id, scope)).fetchone()
             if (current[0] if current else None) != expected_prior:
                 raise GraphError('conflict', 'stale scoped baseline predecessor')
+            if current is not None and not refs:
+                raise GraphError('invalid', 'baseline replacement requires exact motivating evidence/claim')
             if new_baseline == expected_prior:
                 raise GraphError('invalid', 'transition requires a different baseline')
             self._refs(tuple(r for r, _ in affected), 'TQHC')
             if any(d not in ('retain', 'redirect_proposed', 'pause_direction') for _, d in affected):
                 raise GraphError('invalid', 'unknown affected direction disposition')
             transition = new_id('transition')
+            basis = 'initial_reference_choice' if current is None else 'evidence_motivated_transition'
             self.db.execute('INSERT INTO graph_transitions VALUES (?,?,?,?,?,?,?)',
                             (transition, self.study_id, scope, expected_prior, new_baseline,
-                             bounded(request), seq))
+                             bounded({**request, 'basis': basis}), seq))
             return {'transition_id': transition, 'active_baseline': new_baseline, 'scope': scope}
         return self._mutate('record_baseline_transition', request, operation_id, actor, write, operator=True)
 

@@ -16,10 +16,33 @@ ideas or baselines and record baseline transitions. Neither role grants executio
 approval, review or evidence-validation rights. Planner text cannot construct a
 capability through a graph request. All mutations take `operation_id` and `actor`.
 Identical operation ID + normalized request + actor replays the original receipt;
-conflicting reuse raises `GraphError(code='conflict')`. Replays precede head checks.
+conflicting reuse raises `GraphError(code='conflict')`. Replays precede ownership
+and head checks; replay returns history and grants no permission for a new write.
 A receipt contains operation ID, study ID, graph sequence, commit timestamp,
 actor/source and a `result` object containing the created IDs. Sequences start at
 1 and are allocated under BEGIN IMMEDIATE; failed/replayed operations consume none.
+
+Revision ownership is the exact, case-sensitive `Actor.name` recorded by the
+creation operation referenced by `graph_ideas.seq` or `graph_links.seq`. The
+trusted caller must supply this local identity; research text cannot supply an
+operator capability. Role and source describe each operation's authority and
+provenance, rather than changing the owner's identity. An author may revise their
+own idea or revise/withdraw/restore their own unreviewed link. A trusted operator
+may correct another author's assertion; an ordinary recorder with another name
+gets `unauthorized`, with no database changes. The creation operation remains
+the ownership anchor after all corrections, including operator corrections.
+Independent competing interpretations may be added as distinct assertions.
+
+For a registered VS-002 note, the **registering graph actor** owns subsequent
+graph revisions. The original planner/provider, request, proposal/hash/context
+and initial text remain separate, immutable content provenance; registration
+does not claim that the graph actor authored the planner's content. Human Q/H
+and synthesis C use their creating graph actor in the same way. Every revision
+retains its own correcting actor/source/time and previous revision link. There
+is no idea-withdrawal API in this slice. These checks do not authenticate actor
+names or protect against a caller who can impersonate another local identity.
+An operation replay still requires its original full actor tuple, including
+role/source; changing either conflicts even when the owner name matches.
 
 `Ref(role, id, revision=None)` uses O/Q/H/C/T/R/E/B. Q/H/C **require** an exact
 revision ID belonging to that identity. Other roles forbid revision pins; their
@@ -40,7 +63,7 @@ Operations (keyword arguments, internal signatures may evolve):
   joint synthesis. Create DERIVED_FROM lineage links atomically, not independent
   experimental observations. No truth/validation field is accepted.
 - `revise_idea(idea_id, expected_head, text, assumptions, scope, premises=(),
-  joint=False)`: append revision, preserving kind and source attribution. C retains
+  joint=False)`: owner or operator only; append revision, preserving kind and source attribution. C retains
   the joint-premise requirement; Q/H reject premise metadata. New claim revision
   gets its own lineage. Old references keep pointing at old revisions.
 - `add_semantic_link(type, source, target, rationale, assumptions='', scope='',
@@ -50,18 +73,34 @@ Operations (keyword arguments, internal signatures may evolve):
   different revisions), dangling/cross-study references and factual edge types.
   New links have `visibility='unreviewed'`.
 - `revise_or_withdraw_link(link_id, expected_head, rationale, assumptions='',
-  scope='', polarity=None, target=None, withdraw=False)`: append correction or
+  scope='', polarity=None, target=None, withdraw=False)`: owner or operator only; append correction or
   withdrawal attributed to the caller; source and type stay fixed. Target may be
   replaced with another valid pinned revision; no assessment/review is inherited.
   Withdrawals retain endpoints/content and record a new correction rationale.
 - `create_baseline(scope, method, configuration, references=())`: immutable
   operator snapshot with bounded textual configuration and exact references.
 - `record_baseline_transition(scope, new_baseline, expected_prior, rationale,
-  motivations, affected=())`: operator only; first activation expects None.
-  New/old baselines must match scope, motivations are exact E/C references,
+  motivations, affected=())`: operator only; first activation expects None and
+  no currently active baseline in that scope. Initial activation permits empty
+  motivations and requires a nonempty valid operator rationale; it records an
+  initial reference choice, not an evidence-supported research conclusion.
+  Supplied motivations still must be valid E/C references. Subsequent replacement
+  (including reversion) requires at least one exact E/C motivation and the current
+  predecessor. New/old baselines must match scope,
   affected is up to 64 `(Ref(T/Q/H/C), disposition)` pairs with disposition
   retain/redirect_proposed/pause_direction. CAS against last scoped transition;
   reversion uses a new operation, without touching the execution queue.
+
+New transition bodies record `basis: initial_reference_choice` or
+`basis: evidence_motivated_transition`. This is descriptive provenance, never
+scientific validation; operator rationale is not an observation. Initial
+activation creates no SUPERSEDES edge. API arguments, canonical operation
+requests, receipt result fields and schema v3 DDL are unchanged. Existing
+transition bodies without `basis` remain valid and are never backfilled.
+Previously committed operations, including old cross-author corrections and
+baseline activations, replay their exact receipts without rewriting history.
+New revision requests use the ownership rule above, and new replacements still
+require evidence/claim motivation.
 
 Errors use `GraphError` (`invalid`, `not_found`, `conflict`, `unauthorized`,
 `schema`, `limit`); SQLite failures propagate and roll back the logical operation.

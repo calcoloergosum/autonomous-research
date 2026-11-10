@@ -1,4 +1,144 @@
-# Current state — VS-003 implemented and verified offline
+# Current state — VS-003 final review corrections verified
+
+**As of 2026-11-10:** Both implementation-review findings (P1 ownership and
+P2 initial baseline activation) are corrected within the approved VS-003 scope.
+The complete regression suite passes: **450 tests in 17.47s**, including all
+G1–G10 acceptance cases, VS-001 on v1/v2/v3 and VS-002 on v2/v3. This remains an
+offline engineering fixture with unreviewed graph assertions and unvalidated
+observations. No VS-004/VS-005 feature, scientific review, model/API integration,
+new worker, execution permission, or authorization delegation was added.
+
+The complete implementation from `0e7b5a4` was cherry-picked onto
+`implement/vs003-research-graph`, based on current `origin/main` (`3d9670d`).
+This includes the full implementation relative to main while leaving the original
+implementation branch intact. PR #1 is already merged and concerned the design
+specification; it is not reused. GitHub access is limited to the requested
+repository/PR operations; implementation and fixture execution remain offline.
+The unrelated untracked `START_HERE_KO.md`, `WORKFLOW.md`, and `docs/roadmap.md`
+and all prior local databases were preserved.
+
+## Finalized ownership policy (P1)
+
+Ownership is the exact, case-sensitive local `Actor.name` on the **creation**
+operation referenced by `graph_ideas.seq` or `graph_links.seq`. Source records
+provenance, and role records caller capability for that operation; neither
+changes the owner identity. `revise_idea` and `revise_or_withdraw_link` now use
+one ownership check against that original operation inside the write transaction:
+
+- The original author may revise their idea or revise, withdraw or restore their
+  own unreviewed semantic assertion, subject to the existing expected-head rule.
+- A trusted operator may correct or withdraw another author's assertion. The
+  operator's correction is attributed but never transfers ownership.
+- Another ordinary recorder receives `unauthorized`, with no inserted revision,
+  receipt, sequence increment or other database change. They may instead create
+  their own separately attributed competing interpretation.
+- For VS-002 notes, the registering graph actor owns graph edits. Original
+  provider/request/proposal/hash/context and planner text remain immutable source
+  provenance, rather than being relabeled as the registrar's authored content.
+  Human Q/H and joint synthesis C follow the same creation-operation rule.
+
+Committed operation replays still precede the new ownership/head checks and
+return the original receipt. Tests reproduce a pre-fix cross-author correction,
+reopen the database, and verify replay is read-only while a new cross-author
+request is refused. Exact replays still bind the full actor tuple and request;
+changing either conflicts. Old corrections are not retroactively erased or
+reclassified. Older revisions and each correcting actor/source/time remain
+available through historical queries. There is no new idea-withdrawal API.
+
+These are local identity assertions, not authentication. The trusted calling
+code must supply actor name and operator capability; arbitrary research text
+cannot do so. A host owner or caller able to impersonate a local actor remains
+trusted. There is no scientific validation or capability delegation mechanism.
+
+## Initial versus subsequent baseline transitions (P2)
+
+An initial activation requires `expected_prior=None`, no active baseline in that
+scope, a trusted operator, and valid nonempty rationale. It now accepts
+`motivations=()` before any evidence exists. Any supplied motivations still must
+be valid exact E/C references. Its stored transition body records
+`basis=initial_reference_choice`; this is a reference choice, not an
+evidence-supported research conclusion, and its rationale is not an observation.
+
+A replacement or reversion still requires the current predecessor and at least
+one valid exact E/C motivation. Its new body records
+`basis=evidence_motivated_transition`, without implying scientific validation.
+Concurrent initializers or replacements cannot both commit against the same
+prior state. Identical operation replay returns the original receipt. Scoped
+active state and prior states remain projections of append-only transitions.
+
+There is **no schema migration or API signature/receipt change** for these fixes.
+`basis` is additive metadata on newly inserted transition JSON bodies. Tests
+prepare the exact older encoding without that key and confirm restart, verified
+v3 migration no-op, history and receipt replay leave all bytes/rows unchanged.
+The original requests and result shapes are unchanged, and old transition bodies
+are never backfilled. Initial activation without E/C is the explicit exception
+authorized by this final-review task to the earlier implementation assumption.
+No other specification deviation or unresolved architectural approval is needed.
+
+## Verification actually executed for the final review
+
+Environment: existing offline `.venv`, Python 3.12.3, SQLite 3.45.1,
+PyYAML 6.0.1 and pytest 9.1.1. No dependencies were installed.
+
+| Command/check | Actual result |
+| --- | --- |
+| Baseline `python -m pytest -q` before corrections | 427 passed in 16.56s |
+| Two focused reproductions, `python -m pytest -q tests/test_graph.py -k 'review_p1_foreign or review_p2_initial'` | 2 failed, 68 deselected in 0.21s: foreign recorder was accepted and evidence-free activation refused |
+| `python -m pytest -q tests/test_graph.py` after corrections | 88 passed in 3.75s, before the last three legacy/invalid-motivation cases were added |
+| Final complete `python -m pytest -q` | **450 passed in 17.47s** |
+| Documented VS-003 offline fixture and separate-process restart inspection | Both exit 0; verification below |
+| `git diff --check` | Exit 0, no whitespace errors |
+
+The final graph suite has 91 cases, including 23 new review regressions. These
+exercise all Q/H/C creation paths and note registration, self-revision,
+operator correction and withdrawal, denied foreign revision/withdrawal,
+non-transfer of ownership to a latest reviser, coexisting contradictory
+interpretations, historical original authorship, stale heads, replay and exact
+no-change checks. Baseline tests cover evidence-free initialization, invalid
+rationale/references, recorder refusal, conflicting/concurrent initializers,
+replay, motivated replacement, rejection of empty subsequent motivations, and
+unchanged pending/running/completed work, observations, charter and legacy
+context. Existing G1–G10 tests continue to cover the original graph, migration,
+bounds and compatibility contracts.
+
+The README's documented commands were executed using a fresh directory:
+
+```bash
+source .venv/bin/activate
+mkdir -p .local
+graph_demo_dir=$(mktemp -d .local/vs003-review.XXXXXX)
+python -m arf.graph_demo --db "$graph_demo_dir/arf.db" > "$graph_demo_dir/result.json"
+python -m arf.graph_demo --inspect --db "$graph_demo_dir/arf.db" > "$graph_demo_dir/restarted.json"
+```
+
+Actual directory: `.local/vs003-review.JeAfIA/`. JSON transcripts are preserved
+beside `arf.db`. Both demo executions succeeded: T1 mean 5.0/count 4,
+wall_seconds 0.019873816519975662; T2 mean 9.0/count 2,
+wall_seconds 0.01906896010041237. Costs remain zero for LLM tokens, GPU seconds
+and human minutes, with CPU seconds null/unmeasured. These are measured fixture
+durations, not forecasts. Exactly two observations remain unvalidated; task
+`planner-demo-b0849cb9412046e2` stays pending without a run. Graph sequence is 20;
+as-of(18) preserves the earlier assessment and motivation. Scoped baseline
+`baseline-f4bcc065-86ae-4e45-a84b-2a6946d9a4e1` remains active at transition 18.
+Every populated v2 row and the legacy context remained unchanged through graph
+writes. The bounded query reported truncation; restart preserved sequence,
+runs, observations and active baseline. `PRAGMA foreign_key_check` returned no
+violations.
+
+Final correction files are `arf/graph.py`, `tests/test_graph.py`,
+`docs/interfaces-vs003.md`, and this state log. README examples are unchanged by
+the corrections. The complete implementation PR also includes the original graph
+modules, explicit v3 migration, fixture, compatibility extensions, documentation
+and expanded regression matrix. Remaining limitations from the initial report
+still apply: local trusted identities, no historical reconstruction of legacy
+execution status, unchanged VS-002 context v1, no scientific certification,
+network research, automatic policy or new executable worker. The implementation
+PR is for review; no merge is authorized or performed.
+
+The initial implementation and earlier observations below are historical and
+remain intact, including the former evidence requirement for initial activation.
+
+## Historical initial VS-003 implementation report
 
 **As of 2026-11-10:** The approved VS-003 G1–G10 scope and ADR-016–023 are
 implemented. VS-001/VS-002 remain operational on their original schemas and v3.

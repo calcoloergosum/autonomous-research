@@ -664,3 +664,329 @@ def test_g10_candidate_scan_exhaustion_is_visible_even_for_irrelevant_edges(grap
     link(graph, 'INVESTIGATES', Ref('T', 'pending'), h, op='investigates')
     view = graph.ancestry('pending', limits=QueryLimits(nodes=20, edges=2))
     assert view['truncated'] and view['frontier']
+
+
+OTHER_RECORDER = Actor('other-recorder', 'recorder', 'independent offline interpretation')
+
+
+def test_review_p1_foreign_recorder_cannot_revise_link(graph):
+    evidence = observed(graph, 1)[0]
+    hypothesis = idea(graph)
+    original = link(graph, 'ASSESSES', evidence, hypothesis,
+                    polarity='supports', assumptions='a', scope='s')['result']
+    before = list(graph.db.iterdump())
+    with pytest.raises(GraphError, match='unauthorized'):
+        graph.revise_or_withdraw_link(link_id=original['link_id'], expected_head=original['revision_id'],
+            rationale='Another recorder claims correction rights', assumptions='a', scope='s',
+            polarity='contradicts', operation_id='foreign-correction', actor=OTHER_RECORDER)
+    assert list(graph.db.iterdump()) == before
+
+
+def test_review_p2_initial_activation_without_evidence(graph):
+    initial = baseline(graph, 'initial-reference')
+    before = legacy_rows(graph.store)
+    request = dict(scope='demo', new_baseline=initial, expected_prior=None,
+        rationale='Operator chooses a reference before any experiment', motivations=(),
+        operation_id='initial-choice', actor=ACTOR)
+    receipt = graph.record_baseline_transition(**request)
+    after = list(graph.db.iterdump())
+    assert graph.record_baseline_transition(**request) == receipt
+    assert list(graph.db.iterdump()) == after
+    assert graph.store.evidence() == []
+    assert legacy_rows(graph.store) == before
+    row = graph.db.execute('SELECT * FROM graph_transitions WHERE transition_id=?',
+                           (receipt['result']['transition_id'],)).fetchone()
+    body = json.loads(row['body'])
+    assert body['basis'] == 'initial_reference_choice'
+    assert body['motivations'] == []
+    assert row['old_baseline'] is None
+    assert graph.as_of(receipt['graph_seq'] - 1)['active_baselines'] == []
+    assert graph.as_of(receipt['graph_seq'])['active_baselines'][0]['baseline_id'] == initial
+
+
+def revision_idea_fixture(graph, kind):
+    """All graph-owned idea paths, with RECORDER's name as the stable owner."""
+    if kind in ('Q', 'H'):
+        creator = Actor(RECORDER.name, 'operator', 'human idea creation')
+        result = graph.create_human_idea(kind=kind, text='Original human idea',
+            operation_id='owned-idea', actor=creator)['result']
+        kwargs = {}
+    elif kind == 'C':
+        premises = tuple(observed(graph))
+        result = graph.create_claim(text='Original synthesis', assumptions='a', scope='s',
+            premises=premises, operation_id='owned-idea', actor=RECORDER)['result']
+        kwargs = {'premises': premises, 'joint': True}
+    else:
+        from arf.planner import PlannerResponse
+        class Note:
+            def propose(self, request):
+                return PlannerResponse(canonical({'rationale': 'Synthetic note fixture', 'evidence_refs': [],
+                    'action': {'type': 'research_note', 'note_kind': kind.removeprefix('note-'),
+                               'text': 'Original planner content'}}))
+        plans = PlanStore(graph.store)
+        context = plans.export()['context_sha256']
+        proposal = propose(plans, context, 'owned-note', 'note', provider=Note())['proposal_id']
+        result = graph.register_note(proposal_id=proposal, operation_id='owned-idea', actor=RECORDER)['result']
+        kwargs = {}
+    return Ref(result['kind'], result['idea_id'], result['revision_id']), kwargs
+
+
+@pytest.mark.parametrize('kind', ['Q', 'H', 'C', 'note-question', 'note-hypothesis'])
+def test_review_p1_idea_owner_is_creator_not_latest_reviser(graph, kind):
+    ref, premise_args = revision_idea_fixture(graph, kind)
+    creation_seq = graph.sequence()
+    original = graph.read_graph(node=ref)['nodes'][0]
+    def request(head, op, actor, value):
+        return dict(idea_id=ref.id, expected_head=head, text=value, assumptions='a', scope='s',
+                    operation_id=op, actor=actor, **premise_args)
+    before = list(graph.db.iterdump())
+    with pytest.raises(GraphError, match='unauthorized'):
+        graph.revise_idea(**request(ref.revision, 'unauthorized-idea', OTHER_RECORDER, 'Foreign revision'))
+    assert list(graph.db.iterdump()) == before
+    owner = Actor(RECORDER.name, 'recorder', 'new source attribution for the same local author')
+    own_request = request(ref.revision, 'owner-revision', owner, 'Own revision')
+    own = graph.revise_idea(**own_request)
+    correction_actor = Actor('correction-operator', 'operator', 'trusted operator correction')
+    correction = graph.revise_idea(**request(own['result']['revision_id'], 'operator-revision',
+                                            correction_actor, 'Operator correction'))
+    # Correction provenance must not transfer ownership to the latest reviser.
+    downgraded = Actor(correction_actor.name, 'recorder', correction_actor.source)
+    before = list(graph.db.iterdump())
+    with pytest.raises(GraphError, match='unauthorized'):
+        graph.revise_idea(**request(correction['result']['revision_id'], 'reviser-takeover',
+                                    downgraded, 'Attempted takeover'))
+    assert list(graph.db.iterdump()) == before
+    final = graph.revise_idea(**request(correction['result']['revision_id'], 'owner-after-correction',
+                                       owner, 'Owner still owns this idea'))
+    after = list(graph.db.iterdump())
+    assert graph.revise_idea(**own_request) == own  # replay precedes both head and ownership checks
+    with pytest.raises(GraphError, match='conflict'):
+        graph.revise_idea(**request(ref.revision, 'stale-idea', owner, 'Stale revision'))
+    with pytest.raises(GraphError, match='conflict'):
+        graph.revise_idea(**{**own_request, 'actor': OTHER_RECORDER})
+    assert list(graph.db.iterdump()) == after
+    old = graph.as_of(creation_seq, node=Ref(ref.role, ref.id))['nodes'][0]
+    assert old == original
+    history = graph.read_graph(node=Ref(ref.role, ref.id), history=True)['nodes']
+    assert len(history) == 4
+    assert history[0]['actor']['name'] == RECORDER.name
+    assert history[2]['actor']['name'] == correction_actor.name
+    assert history[-1]['ref']['revision'] == final['result']['revision_id']
+    assert all(n['origin'] == original['origin'] for n in history)
+    if kind.startswith('note-'):
+        assert old['origin']['type'] == 'research_note'
+        assert old['origin']['requests'][0]['provider_name'] == 'fixture-mock'
+        assert old['actor'] == asdict(RECORDER)  # registrar owns graph edits; planner retains content credit
+
+
+@pytest.mark.parametrize('type', ['ASSESSES', 'MOTIVATED_BY'])
+def test_review_p1_link_revision_withdrawal_competition_and_original_owner(graph, type):
+    evidence = observed(graph, 1)[0]
+    hypothesis = idea(graph)
+    source, target = (evidence, hypothesis) if type == 'ASSESSES' else (hypothesis, evidence)
+    metadata = {'polarity': 'supports', 'assumptions': 'a', 'scope': 's'} if type == 'ASSESSES' else {}
+    initial = link(graph, type, source, target, **metadata)
+    initial_seq = graph.sequence()
+    ref = initial['result']
+    def correction(head, op, actor, **extras):
+        return dict(link_id=ref['link_id'], expected_head=head, rationale='Attributed correction',
+                    operation_id=op, actor=actor, **extras)
+    for withdraw in (False, True):
+        before = list(graph.db.iterdump())
+        extras = {'withdraw': True} if withdraw else metadata
+        with pytest.raises(GraphError, match='unauthorized'):
+            graph.revise_or_withdraw_link(**correction(ref['revision_id'], 'foreign-' + str(withdraw),
+                                                       OTHER_RECORDER, **extras))
+        assert list(graph.db.iterdump()) == before
+    own_request = correction(ref['revision_id'], 'own-link-correction', RECORDER, **metadata)
+    own = graph.revise_or_withdraw_link(**own_request)
+    operator = Actor('link-correction-operator', 'operator', 'trusted correction')
+    corrected = graph.revise_or_withdraw_link(**correction(own['result']['revision_id'],
+                                                           'operator-link-correction', operator, **metadata))
+    before = list(graph.db.iterdump())
+    with pytest.raises(GraphError, match='unauthorized'):
+        graph.revise_or_withdraw_link(**correction(corrected['result']['revision_id'], 'takeover-link',
+                                                   Actor(operator.name, 'recorder', operator.source),
+                                                   withdraw=True))
+    assert list(graph.db.iterdump()) == before
+    withdrawn = graph.revise_or_withdraw_link(**correction(corrected['result']['revision_id'],
+                                                           'owner-withdrawal', RECORDER, withdraw=True))
+    assert graph.read_graph(edge_id=ref['link_id'])['edges'] == []
+    # A separate competing assertion has its own identity and attribution.
+    competing = {**metadata, 'polarity': 'contradicts'} if type == 'ASSESSES' else metadata
+    other = graph.add_semantic_link(type=type, source=source, target=target,
+        rationale='Independent competing interpretation', operation_id='competing', actor=OTHER_RECORDER, **competing)
+    restored = graph.revise_or_withdraw_link(**correction(withdrawn['result']['revision_id'],
+                                                           'owner-restores-link', RECORDER, **metadata))
+    current = graph.read_graph(edge_types=(type,))['edges']
+    assert {e['id'] for e in current} == {ref['link_id'], other['result']['link_id']}
+    assert {e['actor']['name'] for e in current} == {RECORDER.name, OTHER_RECORDER.name}
+    if type == 'ASSESSES':
+        assert {e['polarity'] for e in current} == {'supports', 'contradicts'}
+    before = list(graph.db.iterdump())
+    assert graph.revise_or_withdraw_link(**own_request) == own
+    with pytest.raises(GraphError, match='conflict'):
+        graph.revise_or_withdraw_link(**correction(ref['revision_id'], 'stale-link', RECORDER, **metadata))
+    assert list(graph.db.iterdump()) == before
+    history = graph.read_graph(edge_id=ref['link_id'], history=True)['edges']
+    assert len(history) == 5
+    assert history[0]['actor'] == asdict(RECORDER)
+    assert history[2]['actor'] == asdict(operator)
+    assert history[3]['visibility'] == 'withdrawn'
+    assert history[-1]['revision_id'] == restored['result']['revision_id']
+    assert graph.as_of(initial_seq, edge_id=ref['link_id'])['edges'] == [history[0]]
+    # Operator withdrawal of another author's independent assertion is also allowed.
+    graph.revise_or_withdraw_link(link_id=other['result']['link_id'], expected_head=other['result']['revision_id'],
+        rationale='Operator records competing assertion withdrawal', withdraw=True,
+        operation_id='operator-withdraws-other', actor=operator)
+
+
+@pytest.mark.parametrize('kind', ['idea', 'link'])
+def test_review_p1_old_committed_foreign_correction_replays_without_new_authority(graph, monkeypatch, kind):
+    evidence = observed(graph, 1)[0]
+    hypothesis = idea(graph)
+    if kind == 'idea':
+        method = 'revise_idea'
+        request = dict(idea_id=hypothesis.id, expected_head=hypothesis.revision,
+            text='Historical foreign correction', operation_id='pre-fix-correction', actor=OTHER_RECORDER)
+    else:
+        original = link(graph, 'MOTIVATED_BY', hypothesis, evidence)['result']
+        method = 'revise_or_withdraw_link'
+        request = dict(link_id=original['link_id'], expected_head=original['revision_id'],
+            rationale='Historical foreign correction', operation_id='pre-fix-correction', actor=OTHER_RECORDER)
+    # Reproduce the permissive 0e7b5a4 write policy solely while preparing old records.
+    with monkeypatch.context() as old_policy:
+        old_policy.setattr(graph, '_require_revision_owner', lambda *args: None)
+        committed = getattr(graph, method)(**request)
+    before = list(graph.db.iterdump())
+    with Store(graph.store.path) as reopened:
+        service = GraphService(reopened)
+        assert getattr(service, method)(**request) == committed
+        with pytest.raises(GraphError, match='unauthorized'):
+            getattr(service, method)(**{**request, 'operation_id': 'new-foreign-attempt',
+                                       'expected_head': committed['result']['revision_id']})
+    assert list(graph.db.iterdump()) == before
+
+
+@pytest.mark.parametrize('rationale', ['', '   ', None, 12, 'x' * 4097, '\ud800'])
+def test_review_p2_initial_rationale_must_be_valid_nonempty_text(graph, rationale):
+    initial = baseline(graph, 'initial-reference')
+    before = list(graph.db.iterdump())
+    with pytest.raises(GraphError):
+        graph.record_baseline_transition(scope='demo', new_baseline=initial, expected_prior=None,
+            rationale=rationale, motivations=(), operation_id='bad-initial-rationale', actor=ACTOR)
+    assert list(graph.db.iterdump()) == before
+
+
+def test_review_p2_recorder_and_conflicting_initializer_make_no_changes(graph):
+    first, second = baseline(graph, 'B0'), baseline(graph, 'B1')
+    request = dict(scope='demo', new_baseline=first, expected_prior=None,
+                   rationale='Initial operator reference choice', motivations=(), operation_id='initial')
+    before = list(graph.db.iterdump())
+    with pytest.raises(GraphError, match='unauthorized'):
+        graph.record_baseline_transition(**request, actor=RECORDER)
+    assert list(graph.db.iterdump()) == before
+    receipt = graph.record_baseline_transition(**request, actor=ACTOR)
+    before = list(graph.db.iterdump())
+    with pytest.raises(GraphError, match='conflict'):
+        graph.record_baseline_transition(**{**request, 'new_baseline': second, 'operation_id': 'second-initial'}, actor=ACTOR)
+    assert graph.record_baseline_transition(**request, actor=ACTOR) == receipt
+    assert list(graph.db.iterdump()) == before
+
+
+def test_review_p2_concurrent_initial_activation_has_one_winner_without_evidence(graph):
+    baselines = (baseline(graph, 'B0'), baseline(graph, 'B1'))
+    def initialize(baseline_id):
+        with Store(graph.store.path) as store:
+            try:
+                return GraphService(store).record_baseline_transition(scope='demo', new_baseline=baseline_id,
+                    expected_prior=None, rationale='Concurrent initial reference choice', motivations=(),
+                    operation_id=baseline_id, actor=ACTOR)
+            except GraphError as error:
+                return error.code
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(initialize, baselines))
+    assert len([r for r in results if isinstance(r, dict)]) == results.count('conflict') == 1
+    assert graph.store.evidence() == []
+    assert len(graph.read_graph()['active_baselines']) == 1
+
+
+def test_review_p2_subsequent_requires_evidence_and_preserves_execution_history(graph):
+    evidence = observed(graph, 1)[0]
+    graph.store.add_task(TaskSpec.parse(spec('running-task')))
+    graph.store.claim_next()  # durable uncertain attempt must remain running, without recovery/retry
+    graph.store.add_task(TaskSpec.parse(spec('pending-task')))
+    plans = PlanStore(graph.store)
+    context = plans.export()
+    before_legacy = legacy_rows(graph.store)
+    first, second = baseline(graph, 'B0'), baseline(graph, 'B1')
+    activate = graph.record_baseline_transition(scope='demo', new_baseline=first, expected_prior=None,
+        rationale='Initial reference, independent of an evidential conclusion', motivations=(),
+        operation_id='initial', actor=ACTOR)
+    request = dict(scope='demo', new_baseline=second, expected_prior=first,
+        rationale='Proposed follow-up baseline', motivations=(), operation_id='replacement', actor=ACTOR)
+    for change, code in (({}, 'invalid'), ({'expected_prior': None}, 'conflict'),
+                         ({'motivations': (Ref('E', 'missing'),)}, 'not_found')):
+        before = list(graph.db.iterdump())
+        with pytest.raises(GraphError, match=code):
+            graph.record_baseline_transition(**{**request, **change})
+        assert list(graph.db.iterdump()) == before
+    replacement_request = {**request, 'motivations': (evidence,)}
+    receipt = graph.record_baseline_transition(**replacement_request)
+    assert graph.record_baseline_transition(**replacement_request) == receipt
+    assert graph.record_baseline_transition(scope='demo', new_baseline=first, expected_prior=None,
+        rationale='Initial reference, independent of an evidential conclusion', motivations=(),
+        operation_id='initial', actor=ACTOR) == activate
+    body = json.loads(graph.db.execute('SELECT body FROM graph_transitions WHERE transition_id=?',
+                                      (receipt['result']['transition_id'],)).fetchone()[0])
+    assert body['basis'] == 'evidence_motivated_transition'
+    assert body['motivations'] == [asdict(evidence)]
+    assert graph.as_of(activate['graph_seq'])['active_baselines'][0]['baseline_id'] == first
+    assert graph.as_of(receipt['graph_seq'])['active_baselines'][0]['baseline_id'] == second
+    assert legacy_rows(graph.store) == before_legacy
+    assert plans.export() == context
+    assert graph.store.task('running-task')['status'] == 'running'
+    assert graph.store.task('pending-task')['status'] == 'pending'
+    assert all(e['validation_status'] == 'unvalidated' for e in graph.store.evidence())
+
+
+def test_review_p2_legacy_transition_bodies_and_receipts_replay_unchanged(graph, monkeypatch):
+    import arf.graph as module
+    evidence = observed(graph, 1)[0]
+    first, second = baseline(graph, 'B0'), baseline(graph, 'B1')
+    original_bounded = module.bounded
+    def legacy_body(value):
+        # Before these fixes, transition bodies had no basis field. Prepare
+        # that historical encoding at insertion, never rewrite an existing row.
+        if isinstance(value, dict) and 'basis' in value:
+            value = {key: item for key, item in value.items() if key != 'basis'}
+        return original_bounded(value)
+    requests = [dict(scope='demo', new_baseline=new, expected_prior=old,
+                     rationale='Legacy evidence-motivated fixture', motivations=(evidence,),
+                     operation_id=op, actor=ACTOR)
+                for op, old, new in (('old-initial', None, first), ('old-replacement', first, second))]
+    with monkeypatch.context() as old_encoding:
+        old_encoding.setattr(module, 'bounded', legacy_body)
+        receipts = [graph.record_baseline_transition(**request) for request in requests]
+    before = list(graph.db.iterdump())
+    with Store(graph.store.path) as reopened:
+        service = GraphService(reopened)
+        assert migrate(reopened) == {'schema_version': 3, 'status': 'already_current'}
+        for request, receipt in zip(requests, receipts):
+            assert service.record_baseline_transition(**request) == receipt
+        assert service.as_of(receipts[0]['graph_seq'])['active_baselines'][0]['baseline_id'] == first
+        assert service.read_graph()['active_baselines'][0]['baseline_id'] == second
+        for row in reopened.connection.execute('SELECT body FROM graph_transitions'):
+            assert 'basis' not in json.loads(row['body'])
+    assert list(graph.db.iterdump()) == before
+
+
+@pytest.mark.parametrize('motivations', [(Ref('E', 'missing'),), (Ref('H', 'missing', 'missing'),)])
+def test_review_p2_optional_initial_motivations_still_require_valid_evidence_or_claims(graph, motivations):
+    initial = baseline(graph, 'initial-reference')
+    before = list(graph.db.iterdump())
+    with pytest.raises(GraphError):
+        graph.record_baseline_transition(scope='demo', new_baseline=initial, expected_prior=None,
+            rationale='Initial choice with an invalid supplied motivation', motivations=motivations,
+            operation_id='invalid-motivation', actor=ACTOR)
+    assert list(graph.db.iterdump()) == before
