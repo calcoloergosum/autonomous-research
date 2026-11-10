@@ -70,15 +70,15 @@ Graph roles currently include `O, Q, H, C, T, R, E, B` and bounded query limits;
 
 **P2 note:** the current v4 scheduler may return `needs_decision / unranked_ready_task` if an admitted ready task is outside the recommendation. A subsequent user decision favors partial ranking, but that behavioral change has not been merged here. VS-005 must display the *stored decision and dispatch facts*, not invent a policy or mutate scheduling behavior.
 
-### 3.2 Temporal truth: three modes, no fake global time machine
+### 3.2 Temporal truth: two UI modes, three underlying meanings
 
 | Mode | Show | Explicit prohibition |
 | --- | --- | --- |
 | **Live** | One consistent read of current graph, task/statuses, latest saved decisions/dispatch records | Do not label current status as historical merely because it is displayed near old records |
 | **Decision checkpoint** | Exact stored Decision Context + its selected graph/assumptions, ranked candidate membership, source/policy version, cost estimates and publication | Do not substitute current task statuses into an old context without marking them `current`; no inferred missing historical facts |
-| **Graph as-of** | Research Graph revision heads and baselines at graph sequence `N` | This is **graph history only**; old task/run/evidence *status* cannot be restored by graph sequence alone |
+| **Graph as-of (underlying data capability, not a third v1 UI mode)** | Research Graph revision heads and baselines at graph sequence `N`, when linked or inspected from a checkpoint | This is **graph history only**; old task/run/evidence *status* cannot be restored by graph sequence alone |
 
-Proposed explicit badges/labels in data, not flashy UI: `snapshot_at_decision`, `current_execution`, `graph_as_of`, `unavailable_historically`, `unreviewed`, `truncated`, `synthetic_proxy`. These represent data semantics; they are not evidence certifications.
+**Only two user-facing temporal modes in v1: `Live` and `Pinned Decision checkpoint`.** Graph as-of is a qualified data projection used when relevant, not another universal time-navigation screen. Proposed data labels: `snapshot_at_decision`, `current_execution`, `graph_as_of`, `unavailable_historically`, `not_recorded`, `unreviewed`, `truncated`, `synthetic_proxy`. These represent data semantics; they are not evidence certifications.
 
 **Checkpoint comparison:** compare `Decision D1` and `Decision D2` on stable candidate IDs/versions, selected membership, rank/exclusion, cost estimates, reasoning and recorded context pins. Three separate outcomes must be possible: **value changed**, **observation/query scope changed**, and **not comparable/unknown**. Adding a new candidate does not prove that science progressed. Graph `at_seq` differences must be identified as graph revision changes, never promoted to a complete historical execution reconstruction.
 
@@ -90,9 +90,9 @@ Proposed explicit badges/labels in data, not flashy UI: `snapshot_at_decision`, 
 
 ```text
 Browser  ←same-origin GET/JSON→  127.0.0.1 Python observer
-  Map / Decisions / Execution      |
-  Inspector / Checkpoints          | short bounded SELECTs
-  Live refresh                     v
+  Recent tasks/dispatches          |
+  Why? trace + Inspector           | short bounded SELECTs
+  Pinned checkpoints + live poll   v
                                SQLite v4 (mode=ro + query_only)
                                ├─ Research Graph
                                ├─ Decision Ledger / Contexts
@@ -111,27 +111,27 @@ SQLite must be opened through a **dedicated observer connection**, URI `mode=ro`
 
 Prefer **zero new SQLite schema objects** in VS-005. Graph layout/selection/viewport may live only in the browser's transient state; a persisted shared preference store or annotation feature would be a separate reviewed capability. Do not write graph coordinates, UI timestamps, reader cursors or poll markers to the ARF DB.
 
-If v4 is required for all three lenses, an older v1/v2/v3 DB should show a **clear unsupported-feature message** (or a separately approved reduced mode); never migrate itself. First slice may deliberately support **v4 only** to avoid inventing partial interpretations for older schemas.
+If v4 is required to explain a complete recommendation/dispatch trace, an older v1/v2/v3 DB should show a **clear unsupported-feature message** (or a separately approved reduced mode); never migrate itself. First slice may deliberately support **v4 only** to avoid inventing partial interpretations for older schemas.
 
-## 5. Proposed bounded read-only HTTP surface (not yet approved)
+## 5. Minimal observer read surface (illustrative, not a public API commitment)
 
-Expose a deliberately small set of **versioned GET-only** JSON resources. URLs and response fields below are placeholders for design review, not public contracts:
+**Design the API from the one user journey, not from every future lens.** The earlier nine-endpoint catalog is a **future resource menu**, not nine required v1 routes. A small read-model can serve the first UI with approximately five bounded GET-only capabilities; exact grouping, paths, query names and JSON types are **to be decided after a working static UI prototype**.
 
-| Proposed read | Primary purpose | Source / rule |
+| Candidate capability (illustrative route) | Visible user need | Required semantics |
 | --- | --- | --- |
-| `GET /api/v1/meta` | Study label/hash, schema, observer version, temporal capabilities and current server session epoch | No charter mutation or full path disclosure |
-| `GET /api/v1/changes?since=TOKEN` | Lightweight process-local revision/generation plus changed-domain hints | Graph seq alone is insufficient |
-| `GET /api/v1/graph?focus=ROLE:ID&at_seq=N&depth=...` | Bounded typed graph neighborhood, edges, frontier and active baselines | Reuse `read_graph` / `traverse` semantics; never return an unbounded entire graph |
-| `GET /api/v1/object?kind=...&id=...&revision=...` | Selected object metadata/provenance and relevant exact links | Same-study typed IDs, bounded raw text |
-| `GET /api/v1/timeline?cursor=...` | Stable, paginated decision/graph/run/evidence/dispatch events | Timestamp/sequence provenance and a clear opaque cursor |
-| `GET /api/v1/decision?id=...` | Full saved considered members/ranks/exclusions/assessments/publications/dispatches | Reuse v4 ledger; show synthetic status and completeness |
-| `GET /api/v1/checkpoint?id=...` | Exact saved decision context + explicit `snapshot_at_decision` labeling | No fake historical execution reconstruction |
-| `GET /api/v1/compare?left=...&right=...` | Bounded comparison of two immutable checkpoints | Separate membership change from context scope difference |
-| `GET /api/v1/execution?cursor=...` | Current tasks/blockers plus run/evidence/cost history | Cost prediction vs observed costs shown separately |
+| `GET /api/v1/meta` | Header, supported schema, study identity, observer epoch | No filesystem path, no source mutation |
+| `GET /api/v1/overview` | Small current task summary, last dispatches and recent decisions | One consistent read; bounded page/continuation, honest status |
+| `GET /api/v1/trace?kind=dispatch&id=...` | Selected task/dispatch → candidate → decision → context → run/Evidence, plus a **bounded** motivated graph neighborhood where available | Join by exact stored keys; missing relationships are `not_recorded`; preserve semantic vs execution fact types |
+| `GET /api/v1/checkpoint?id=DECISION_ID` | Open a saved Decision Context and member/rank/exclusion record | Source snapshot clearly separated from current status; optional two-checkpoint comparison can initially happen client-side over two immutable responses |
+| `GET /api/v1/changes?since=TOKEN` | Lightweight live refresh trigger | Observer epoch / connection-scoped change detection; never a fabricated global SQLite revision |
 
-Avoid returning entire v4 contexts on **every** 3-second poll. Graph is focused/paged, timeline paged, large historical context fetched only on explicit user selection. Use one read transaction for each logically related response, explicit `truncated/frontier/continuation` and typed errors: `not_found`, `unsupported_schema`, `invalid_id`, `limit`, `temporarily_unavailable`. Standard server `5xx` never claims `no_ready_task` or study completion.
+An exact selected Task/Run/Evidence may be fetched through the *trace* read-model in this slice; a separate generic `/object`, `/graph`, `/timeline`, `/execution`, `/compare` or full-text search API is **not mandatory**. Add one only if the five-step journey demonstrably cannot be completed without it. Do not design a speculative public API surface.
 
-For UI-specific joins between Graph, Task, Candidate, Decision and Run, use a **read-model projection layer**, not new authoritative persistent cross-links. A Decision candidate's task binding is distinct from its graph motivation; links must be evidence-backed or marked `not_recorded`.
+The read model joins existing v4 decision membership, trusted task bindings, dispatch receipts, run/evidence, and available graph assertions. Do not invent new persisted cross-links, graph motivation or a deterministic scientific explanation when evidence is absent. **All used relations and explanations carry source IDs and temporal labels**; human/AI rationale is attributed judgment, not validated truth.
+
+**Bounds first:** cap response size, list length, graph neighborhood and text fields; use cursor pagination where needed, `truncated/frontier` only when honestly available, and typed `not_found`, `unsupported_schema`, `invalid_id`, `limit` and `temporarily_unavailable` errors. Avoid sending a complete stored Context or full Graph every three seconds. Use a short read transaction for a response that combines logically related data, with no observer write path or speculative snapshot cache.
+
+The observer only displays existing data; no HTTP operation creates candidates, validates research, edits interpretations, starts workers, approves tasks, retries, recovers or changes baselines.
 
 ## 6. Automatic refresh: cheap, consistent and unobtrusive
 
