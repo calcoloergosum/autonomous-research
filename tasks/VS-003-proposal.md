@@ -1,12 +1,12 @@
 # VS-003 proposal — Research Graph data model and operations
 
-**Status: Proposed; not approved.** Prepared 2026-11-10 from the current VS-001/VS-002 implementation.
+**Status: Historical design proposal (reviewed and narrowed 2026-11-10).** Human-approved selections D1–D8 are recorded as ADR-016–023. The **approved implementation contract** is [`VS-003.md`](VS-003.md); broader alternatives in this proposal are not approved implementation scope.
 
-**Authority:** Design only. This document authorizes no implementation, migration, research, network requests, model calls, spending, new workers, or automated approval. Candidate names and storage layouts below are discussion vocabulary, not public interfaces or accepted architecture decisions.
+**Authority:** Historical comparative design only. VS-003 implementation is authorized **solely within** the approved bounded contract in [`VS-003.md`](VS-003.md). Broader candidate names and layouts below are discussion vocabulary, not additional implementation permission. Live research, network, model calls, spending, generated-code execution, new workers and automated approval remain excluded.
 
 Throughout this proposal, **Principle** means an accepted project requirement, **Fact** means behavior found in the current repository, **Recommendation** means a proposed choice, and **Review decision** means an unresolved choice requiring human approval. Statements in recommended-model sections describe proposed behavior, not implemented features.
 
-**Scope refinement from [PR #1](https://github.com/calcoloergosum/autonomous-research/pull/1):** The [minimal implementation specification](VS-003.md) narrows the recommended first slice. Keep typed provenance, attributed interpretations, append-only corrections, bounded queries and operator-recorded baseline transitions. Defer formal scientific reviews, new graph-context artifacts, graph-aware executable planning, idea-to-idea replacement and large-scale benchmarking. The broader design alternatives below remain available for later review; sections 12–15 distinguish them from the recommended minimum. Both documents and D1–D8 remain unapproved; the draft specification is not implementation authorization.
+**Scope refinement from [PR #1](https://github.com/calcoloergosum/autonomous-research/pull/1):** The [minimal implementation specification](VS-003.md) narrows the recommended first slice. Keep typed provenance, attributed interpretations, append-only corrections, bounded queries and operator-recorded baseline transitions. Defer formal scientific reviews, new graph-context artifacts, graph-aware executable planning, idea-to-idea replacement and large-scale benchmarking. The broader design alternatives below remain available for later review; sections 12–15 distinguish them from the recommended minimum. The human owner has approved the narrowed VS-003 implementation and D1–D8 in ADR-016–023. This broader proposal remains non-normative wherever it differs from the approved task.
 
 ## 1. Problem definition and design goals
 
@@ -392,7 +392,7 @@ Out of scope: formal scientific review and validation workflows, new graph-conte
 
 ## 13. Proposed acceptance criteria and tests
 
-These are **future implementation targets**, not test results for a Research Graph implementation. Following PR #1, the minimal G1–G10 criteria in [the draft task](VS-003.md#8-required-acceptance-criteria) define the recommended first acceptance boundary, subject to human approval. The more detailed checks below support that boundary; formal review/context-extension checks and large-scale benchmarks are deferred rather than additional requirements for the first slice.
+These are historical *proposed* checks, not verified Research Graph results. **Only G1–G10 in the [approved VS-003 task](VS-003.md#8-required-acceptance-criteria) are normative for this implementation.** The G11–G13 rows below are **informative stress-test ideas and future-extension examples, not additional VS-003 acceptance gates**. Where a concern overlaps G1–G10 (e.g., atomic writes or bounded traversal), follow the smaller, exact task requirement; do not silently expand the implementation to satisfy the broader formulation here. Formal review, graph-context extensions and large-scale benchmarking are deferred.
 
 | ID | Required check and observable boundary |
 | --- | --- |
@@ -430,7 +430,7 @@ After an approved implementation: run `python -m pytest -q`, the documented sepa
 
 ## 15. Decisions requiring human review
 
-All recommendations remain **unapproved**. Approving this proposal's data model would still require a bounded implementation task and review of any new public/schema contract before implementation.
+D1–D8 have been **approved** as the narrowed selections recorded in ADR-016–023, and the bounded implementation task is [`VS-003.md`](VS-003.md). This table preserves alternative designs for traceability; the alternatives are **not** approved. Material additions beyond the bounded contract still require separate human approval.
 
 | Decision | Recommended selection | Viable alternative / material consequence |
 | --- | --- | --- |
@@ -443,4 +443,4 @@ All recommendations remain **unapproved**. Approving this proposal's data model 
 | D7 Context compatibility | Preserve VS-002 v1 exactly; local reads/writes use sequence/revision pins and operation preconditions. Defer new graph-context artifacts and graph-aware executable planning | Approve separate graph contexts/freshness and a graph-bound proposal/export/approval extension when a Research Manager needs them; broader scope and testing |
 | D8 Public entry points / scope | Internal service plus offline fixture harness first; no new public CLI until a normative contract is approved | Operator CLI reviewed before coding; more usable but larger public surface |
 
-**Suggested follow-up after approval:** Explicitly resolve D1–D8 using the narrowed [draft task](VS-003.md), then approve a bounded implementation assignment and additive v3 persistence/internal-interface contract. Implement typed references and idea/edge history, explicit note registration, bounded provenance/ancestry/impact/as-of reads, and baseline history/transition records through offline fixtures. Preserve legacy context/authorization/execution exactly. Defer formal reviewer workflows, graph-context artifacts, graph-bound planning, idea-to-idea replacement, large-scale benchmarks, autonomy policies and all VS-005 UI/monitoring. No next milestone is authorized by either unapproved document.
+**Suggested follow-up after approval:** Explicitly resolve D1–D8 using the narrowed [draft task](VS-003.md), then approve a bounded implementation assignment and additive v3 persistence/internal-interface contract. Implement typed references and idea/edge history, explicit note registration, bounded provenance/ancestry/impact/as-of reads, and baseline history/transition records through offline fixtures. Preserve legacy context/authorization/execution exactly. Defer formal reviewer workflows, graph-context artifacts, graph-bound planning, idea-to-idea replacement, large-scale benchmarks, autonomy policies and all VS-005 UI/monitoring. VS-003 offline implementation is authorized by the human-approved `VS-003.md`, with its exact G1–G10 scope; this proposal alone grants no further permission.
