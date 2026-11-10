@@ -133,46 +133,52 @@ The read model joins existing v4 decision membership, trusted task bindings, dis
 
 The observer only displays existing data; no HTTP operation creates candidates, validates research, edits interpretations, starts workers, approves tasks, retries, recovers or changes baselines.
 
-## 6. Automatic refresh: cheap, consistent and unobtrusive
+## 6. Live updates that preserve the investigation
 
-**Approved direction:** automatic updates; **tentative v1 implementation:** HTTP polling every **3 seconds** with no WebSocket or background pushes.
+**Approved product behavior:** the viewer automatically refreshes. **Tentative v1 choice:** simple same-origin HTTP polling about every **3 seconds**, without WebSocket/SSE or a push worker.
 
-1. An observer-owned **persistent read-only SQLite connection** may use `PRAGMA data_version` as a cheap detector of commits made by *other* connections. The value is **connection-local**; do not expose it as a portable global DB revision or compare values across fresh connections. No filename mtime checks alone: WAL changes may not update the main file timestamp.
-2. Maintain an **in-process observer epoch and monotonic generation**. On a detected change, increment generation and, if useful, compute bounded domain-specific fingerprints/hints (graph, tasks/runs/evidence, decision ledger). A changed generation means `something may have changed`, not that all objects changed. On server restart/connection replacement, epoch changes and clients re-bootstrap.
-3. Client polls `/changes`; on a change fetch **only the currently visible panel and selected object's bounded data**. Recheck an atomic response snapshot/observed generation to avoid presenting a mixed view as one time. Do not hold SQLite read transactions across HTTP polling or browser interactions.
-4. Keep selected typed ID, lens, filters, graph pan/zoom and expanded neighbors. New graph objects must not trigger a full force-layout reset. Use stable positions/seeded layout with incremental placement of added nodes; remove nodes from the view only when filtering/context semantics demand it.
-5. **Live mode** updates in place; **Decision checkpoint / Graph as-of** remains pinned while a small nonintrusive new-events indication appears. A live event may update the sidebar counter, not forcibly replace the historical selection.
-6. When browser tab is hidden, reduce or suspend polling; on resume perform one fresh bounded check. On server/DB error, keep last **clearly marked stale** view and retry with bounded backoff, never present cached data as fresh current state. If DB is deleted/replaced, epoch/source identity changes and old selections cannot be silently applied to another study.
+1. A persistent SQLite observer connection opened read-only may use `PRAGMA data_version` to notice other connections' commits. The value is **local to that specific connection**—not a portable revision counter or a fresh-connection comparison. Graph sequence alone misses execution/decision changes; main-file modification time alone misses WAL writes.
+2. On detected change, the observer updates its **process-local epoch/generation** and a lightweight `/changes` result. On restart, connection replacement or database identity change, epoch/source identity forces client resynchronization; the API must never treat old cursor tokens as durable database facts.
+3. The browser fetches only the visible recent list and currently selected trace/Inspector if Live is active. One response representing several records must use a **consistent DB read snapshot**; do not hold transactions open between polls. It need not stream the entire graph.
+4. **Do not steal focus:** preserve selected Task/Dispatch ID, Inspector scroll, expanded trace segments and the user's comparison target. A newly recorded event may update a subtle count, not replace the selected object. The initial trace is a small fixed layout, so there is no whole-network simulation to reset.
+5. **Pinned checkpoint mode** remains on that exact saved decision/context across incoming commits. Newly arrived events can be indicated in the header/rail, but archived values cannot be silently replaced with the current execution state.
+6. On hidden tabs, slow/suspend polls and refresh once on resume. On disconnect/busy DB, visibly mark the last view as **stale** and retry with bounded backoff. A cached view cannot masquerade as live.
 
-Polling rate must be adjustable later; no 3-second responsiveness guarantee. A pure notification/watermark is a read optimization, **not** an authorization or scientific status signal.
+Three seconds is a reversible starting interval, **not** a latency guarantee. The observer's data-change detector is a UI optimization, never an execution trigger, research success signal, or reason to write cursor markers into SQLite.
 
-## 7. UI behavior and implementation alternatives
+## 7. Minimum interaction grammar and early prototype
 
-**Graph:** default 1-hop or 2-hop focus, semantic edges and execution dependencies visually distinct, explicit legend and edge labels on inspection. Prevent cycles from growing infinite views; cap nodes/edges and show `more`/frontier controls. Stable typed ID + graph revision should ground each node.
+The initial interface needs only a handful of meaningful operations:
 
-**Inspector:** the primary reading surface. Display raw source refs, original vs retrospective motivation, scientific interpretations (supports/contradicts/inconclusive, `unreviewed`), assessment assumptions, Decision members including not-selected/excluded and predicted vs observed cost. Avoid a generic `confidence 87%` or `research progress 62%` unless scientifically grounded.
+- **Select** a recent Task or Dispatch. The main trace and Inspector show that record and its exact linked records.
+- **Follow** a typed source link in the trace, with a reliable Back/breadcrumb path. A relation missing from Graph or decision provenance is shown as `not_recorded`.
+- **Expand** one local link/evidence detail. Long text and large candidate lists are bounded or paginated; no giant free-layout network.
+- **Pin** a Decision checkpoint. The old stored context and its candidate ranks remain fixed while the viewer continues to observe new live events.
+- **Compare** two recorded Decisions. Prefer a compact table of candidates, rank/exclusion and recorded reasoning changes, with `scope_changed`/`not_comparable` instead of fabricated historical facts.
+- **Return to Live** without discarding the selected object or the reader's location.
 
-**Timeline / Checkpoints:** use simple event chips, compact rank comparison table and text explanations before building complex charts. Click a checkpoint to pin the context; compare two decisions using explicit labels `same scope`, `scope differs`, `unknown historical state`. Historical mode does not automatically jump to latest.
+The **Inspector is the product**, not a decorative sidebar. Its stable labels should include `recorded rationale`, `assumptions`, `source refs`, `unreviewed assessment`, `unvalidated Evidence`, `synthetic proxy`, `predicted cost`, `observed cost`, and `historically unavailable` where appropriate. Never use a synthetic information bonus as a verified scientific importance score.
 
-**Search:** exact ID/name/title + a few bounded text filters from trusted in-database fields; pagination and explicit result source. Do not invent semantic search or require an embeddings index for VS-005.
+**Before freezing server routes or selecting a graph package**, test a tiny static layout filled with the **real VS-004 fixture-shaped responses** (not a generic attractive mock screenshot). Try Task B → why selected → observed E → decision checkpoint → later D. Note every missing or confusing interaction. Only then decide if a small real focused graph is needed; a linked list/mini-DAG may already be better.
 
-**Desktop-first accessibility:** keyboard navigation, focus outline, zoom controls, color-independent edge labels, readable dense panels and reduced-motion option. No decorative animation required. Browser-only graph layout can remain ephemeral and reversible.
+**Implementation preference to review:** bundled vanilla JavaScript/CSS and small SVG/HTML trace, with Python standard-library loopback HTTP, no extra runtime dependency. If the prototype proves a graph interaction library essential, reconsider a pinned, offline-bundled dependency based on measured usability and build/license cost. Keep keyboard access, text labels (not color alone), focus states, browser zoom and reduced-motion usability.
 
-**Minimal frontend alternatives:** (A) small bundled vanilla JS and SVG with deterministic incremental layout (**tentative** for a modest focus graph); (B) pinned local Cytoscape/D3 bundle if a measured prototype demonstrates substantially better graph ergonomics; avoid a heavy framework solely to reproduce an inspector and event rail. A library decision must include license/build artifact and fully offline packaging review.
+Defer rich Focus Mode, Map/Decisions/Execution lens switches, global timeline, free-form semantic search, graph auto-layout, annotations, alerting, user preference persistence, complex charts and reporting. These are **extensions**, not failures of the VS-005 first implementation.
 
-## 8. Narrow v1 vertical slice / demo
+## 8. One end-to-end v1 demonstration
 
-Suggested first scenario uses the **already available v4 synthetic fixture** and must not execute research as part of viewing:
+Use the **existing v4 offline synthetic fixture** as read-only input, including its original B/A/C recommendation, later D, unreviewed graph assessments, measured run costs and `unvalidated` Evidence. Starting Observatory must **not** execute a worker.
 
-1. Start observer pointed at an existing inspected v4 database; see study header, connected status, recent four demo runs B/A/C/D and a compact focused graph.
-2. Select Task B: see original task/admission, matched candidate, the ranked recommendation that dispatched B, its synthetic judgment, actual measured run costs and unvalidated evidence link.
-3. Open the initial Decision checkpoint: see B/A/C membership, synthetic information bonus, considered/excluded unmapped alternatives, saved context scope and explicit provenance. Never label its numerical bonus actual scientific impact.
-4. Compare that checkpoint with the post-C recommendation (D introduced), separating new candidate arrival, changed Evidence/graph context and new synthetic ranking. Follow the recorded replan assessment instead of inventing causal explanations.
-5. On a separate writer process, add a legitimate new Research Graph assertion or execute an already authorized demo task in a **test fixture DB**, not through the observer. Without reloading the page, the Live UI detects and displays the changed domain while preserving selection and layout.
-6. Pin Historical View, generate a subsequent change, confirm the old checkpoint/Inspector does **not** silently become Live or rewrite its archived task statuses.
-7. Confirm browser cannot approve, import, create, retry, recover, activate baseline, edit graph or execute `run-next`; server read-only connection remains unable to write even if a request is malformed.
+1. Open the local URL for an existing v4 database. The initial screen shows the study label, latest task/dispatch summary and connected `Live` state. It is **not** an empty all-purpose graph.
+2. Choose **Task B** or its dispatch from the recent list. The trace shows its actual admitted TaskSpec, candidate binding, recommendation/rank, considered alternatives and policy explanation. If a direct Q/H motivation is not recorded, show `not_recorded`; never infer it.
+3. Inspect B's run/Evidence and observed wall cost, explicitly labeled `unvalidated`. Show synthetic decision proxies and estimated costs separately from actual measurements.
+4. Pin the **initial decision checkpoint**. It exposes the exact saved context, original candidate membership/ranks, source version and partiality status; no current mutable task status masquerades as a historical one.
+5. Compare with the **later decision that introduced D**. Identify observed candidate arrival, revealed synthetic feedback, rank/exclusion changes and changed query scope if any. Present the saved `replan` assessment as an attributed policy result, not a validated causal inference.
+6. From a **separate trusted test writer**, add a legal graph assertion or perform a controlled fixed-worker execution on a disposable fixture. The viewer polls and shows new activity **without page reload or changing the selected B**.
+7. Keep the first checkpoint pinned and make another fixture change. The checkpoint remains unchanged, while a modest "new activity" indication appears. Re-enter Live deliberately.
+8. Send malformed IDs/oversized queries and attempt write-like HTTP methods / SQLite writes through the observer. Confirm bounded failures, no mutating routes, **read-only DB content** and no controller/worker invocation. Existing VS-001–004 regressions and data remain intact.
 
-Do not conflate a successful UI demonstration with a verified scientific conclusion. A dummy DB fixture may intentionally contain a blocked/unranked ready task; display actual `needs_decision` receipt and preserve the currently implemented policy (P2).
+This scenario deliberately uses records that exist **today**. It must not depend on P2 being implemented or infer final study success. A v4 dispatch with `needs_decision / unranked_ready_task` should be displayed as an actual recorded nonexecuting result, not rewritten as an imaginary recommendation. The demo is an engineering observation, not scientific certification.
 
 ## 9. Proposed acceptance matrix (O1–O12; not approved)
 
