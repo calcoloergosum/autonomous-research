@@ -1,6 +1,6 @@
 # Autonomous Research Framework (ARF)
 
-**Status:** VS-001 implemented and verified locally on 2026-11-10. The CLI executes only the built-in deterministic demo worker. The autonomous research capabilities described below remain future work.
+**Status:** VS-001 and offline VS-002 implemented and verified locally on 2026-11-10. Planning uses a deterministic fixture mock, explicit local operator decisions, and a separate task import. The CLI executes only the built-in deterministic demo worker. Autonomous research remains future work.
 
 ARF is a future system for autonomously managing a potentially unbounded portfolio of research tasks to answer a *human-defined* ultimate research question. It will learn estimates of impact and evidence-acquisition cost, balance exploration and exploitation, schedule limited LLM/compute/human resources, and revise intermediate research baselines without changing the ultimate question.
 
@@ -17,7 +17,8 @@ The project development objective (to build ARF) is distinct from the ultimate q
 3. [`docs/architecture.md`](docs/architecture.md): intended separation of research management, scheduling, execution, evidence, and persistence.
 4. [`docs/interfaces.md`](docs/interfaces.md): normative VS-001 contracts and status transitions.
 5. [`tasks/VS-001.md`](tasks/VS-001.md): first implementation task, tests, and acceptance criteria.
-6. [`prompts/codex-vs001.md`](prompts/codex-vs001.md): copy/paste prompt to start Codex.
+6. [`prompts/codex-vs001.md`](prompts/codex-vs001.md): original VS-001 implementation prompt.
+7. [`tasks/VS-002.md`](tasks/VS-002.md) and [`docs/interfaces-vs002.md`](docs/interfaces-vs002.md): approved offline proposal boundary and additive CLI contracts.
 
 ## First milestone (VS-001)
 
@@ -67,6 +68,64 @@ Observed: task `succeeded`, result `{"mean":5.0,"count":4}`, one linked successf
 
 All CLI output is JSON; errors go to stderr with nonzero exit status. `run-next` also returns nonzero for a recorded execution failure. List/show include dependencies and computed `blockers`; show includes run history and actual costs.
 
+## Offline proposal demo (VS-002)
+
+Use a fresh directory so existing observations remain intact. The original
+VS-001 `init` creates schema v1; migration is deliberate. This workflow runs
+only the deterministic mock and the existing demo worker. Each CLI invocation
+is a separate process. Shell variables below contain controller-generated hashes
+and IDs extracted from JSON, never planner commands.
+
+```bash
+source .venv/bin/activate
+mkdir -p .local
+demo_dir=$(mktemp -d .local/vs002.XXXXXX)
+demo_db="$demo_dir/arf.db"
+python -m arf init --db "$demo_db" --charter examples/demo-charter.yaml
+python -m arf task add --db "$demo_db" --spec examples/demo-task.json
+python -m arf run-next --db "$demo_db"
+python -m arf plan migrate --db "$demo_db"
+python -m arf plan migrate --db "$demo_db"
+python -m arf plan export --db "$demo_db" > "$demo_dir/context.json"
+context_hash=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["context_sha256"])' "$demo_dir/context.json")
+python -m arf plan propose --db "$demo_db" --context "$context_hash" --request-id demo-plan --fixture task > "$demo_dir/proposal.json"
+proposal_id=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["proposal_id"])' "$demo_dir/proposal.json")
+python -m arf plan list --db "$demo_db"
+python -m arf plan show --db "$demo_db" --id "$proposal_id"
+python -m arf task list --db "$demo_db"
+python -m arf plan import --db "$demo_db" --id "$proposal_id"  # expected exit 1: unauthorized
+python -m arf plan decide --db "$demo_db" --id "$proposal_id" --decision approve --operator local-demo
+python -m arf plan decide --db "$demo_db" --id "$proposal_id" --decision approve --operator local-demo
+python -m arf plan import --db "$demo_db" --id "$proposal_id"
+python -m arf task list --db "$demo_db"
+python -m arf run-next --db "$demo_db"
+python -m arf plan import --db "$demo_db" --id "$proposal_id"
+python -m arf evidence list --db "$demo_db"
+python -m arf run-next --db "$demo_db"
+```
+
+Observed in the extended 41-process verification: v1 history preserved exactly;
+second migration returned `already_current`; propose/request replay created no
+task; unapproved import exited 1; approval replay returned the original decision;
+import created one pending task with no run. Separate `run-next` returned
+`{"mean":5.0,"count":4}` and **unvalidated** evidence. Receipt replay after
+execution created no task or evidence, and `run-next` returned `no_ready_task`.
+Additional manual fixture work made first approval/import stale; both refused
+with `stale_context`. The final extended demo had three tasks/runs/unvalidated
+observations (original, imported, manual freshness fixture), unchanged charter
+bytes/hash, and no interrupted runs. Notes/no-action records remained inert.
+Actual database: `.local/vs002-verified.rao6zhv5/arf.db`; detailed outcomes and
+local transcript paths are recorded in current-state.
+
+Context exports include the complete stored study/tasks/runs/evidence and exact
+charter bytes. Freshness is strict: changing execution state before first
+approval/import requires a new context/proposal. Identical committed decisions
+and receipts replay without rewriting history. Operator names are locally
+asserted, without authentication. Invalid or interrupted planner requests never
+recall the provider automatically. Planning limits are 1 MiB context, 64 KiB raw
+response, 4 KiB text fields, 64 dependencies/references and depth 32. No evidence
+is silently dropped. See the [full contract](docs/interfaces-vs002.md).
+
 ## Recovery and explicit retry
 
 An interrupted controller leaves its committed attempt `running`. After confirming the previous controller has stopped:
@@ -88,8 +147,8 @@ POSIX advisory locking serializes `run-next` and `recover` on one host; SQLite t
 
 ## Status and work ownership
 
-- This package: VS-001 source, CLI, persistence, fixed worker, and automated acceptance tests are implemented. See current-state for the observed test count and verification details.
-- VS-001 is completed. [VS-002](tasks/VS-002-proposal.md) is a proposal requiring human review before implementation. No real research study, autonomous planner, LLM integration, or advanced scheduler is implemented or authorized.
+- This package: VS-001 execution and VS-002 offline planning/authorization/import are implemented. See current-state for observed verification results.
+- VS-002 implements the approved [task](tasks/VS-002.md) and ADR-012–015. No real research study, live LLM integration, automatic approval, or advanced scheduler is implemented or authorized.
 - Human + ChatGPT: review deviations, decide on public/data interface changes and future milestones.
 
 See [`docs/current-state.md`](docs/current-state.md) for the precise handoff status.

@@ -23,10 +23,19 @@ def spec(task_id="demo-mean", dependencies=None, **overrides):
     return data
 
 
+def pytest_generate_tests(metafunc):
+    # Reuse every original Store-based acceptance case on both schema versions.
+    if metafunc.module.__name__ in ("test_lifecycle", "test_validation_cli") and "store" in metafunc.fixturenames:
+        metafunc.parametrize("store", [1, 2], indirect=True, ids=["v1", "v2"])
+
+
 @pytest.fixture
-def store(tmp_path):
+def store(tmp_path, request):
     with Store(tmp_path / "arf.db", create=True) as database:
         database.import_charter(Charter.parse((ROOT / "examples/demo-charter.yaml").read_bytes()))
+        if getattr(request, "param", 1) == 2:
+            from arf.plan_store import migrate
+            migrate(database)
         yield database
 
 

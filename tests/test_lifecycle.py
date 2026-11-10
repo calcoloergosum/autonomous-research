@@ -309,7 +309,7 @@ def test_a8_finalization_transaction_rolls_back_all_writes(ready):
     assert ready.task("demo-mean")["status"] == "needs_review"
 
 
-def test_history_and_evidence_cannot_be_rewritten(ready):
+def test_history_and_evidence_cannot_be_rewritten(ready, request):
     run_next(ready)
     for statement in (
         "UPDATE runs SET result_json='{}'", "DELETE FROM runs",
@@ -319,7 +319,7 @@ def test_history_and_evidence_cannot_be_rewritten(ready):
         with pytest.raises(sqlite3.IntegrityError):
             ready.connection.execute(statement)
     assert ready.connection.execute("PRAGMA foreign_keys").fetchone()[0] == 1
-    assert ready.connection.execute("PRAGMA user_version").fetchone()[0] == 1
+    assert ready.connection.execute("PRAGMA user_version").fetchone()[0] == request.node.callspec.params["store"]
     assert ready.connection.execute("PRAGMA foreign_key_check").fetchall() == []
 
 

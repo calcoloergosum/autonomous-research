@@ -141,7 +141,7 @@ class Store:
                     for statement in SCHEMA:
                         self.connection.execute(statement)
                     self.connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
-                elif version != SCHEMA_VERSION:
+                elif version not in (1, 2):
                     raise ARFError(f"unsupported database schema version: {version}")
         except BaseException:
             self.connection.close()
@@ -188,31 +188,37 @@ class Store:
 
     def add_task(self, spec: TaskSpec) -> dict:
         with self.transaction():
-            if spec.study_id != self.study()["study_id"]:
-                raise ARFError("task study_id must match the database study")
-            rows = self.connection.execute("SELECT task_id FROM tasks").fetchall()
-            graph: dict[str, list[str]] = {row["task_id"]: [] for row in rows}
-            if spec.task_id in graph:
-                raise ARFError(f"task already exists: {spec.task_id}")
-            if spec.task_id in spec.dependencies:
-                raise ARFError("self-dependency is a cycle")
-            if any(dep not in graph for dep in spec.dependencies):
-                raise ARFError("dependencies must reference existing tasks in the same study")
-            for row in self.connection.execute("SELECT task_id, prerequisite_id FROM dependencies"):
-                graph[row["task_id"]].append(row["prerequisite_id"])
-            graph[spec.task_id] = spec.dependencies
-            check_acyclic(graph)
-            self.connection.execute(
-                """INSERT INTO tasks(study_id,task_id,title,description,kind,input_json,status,created_at)
-                   VALUES (?,?,?,?,?,?,'pending',?)""",
-                (spec.study_id, spec.task_id, spec.title, spec.description, spec.kind,
-                 json_text(spec.input), utc_now()),
-            )
-            self.connection.executemany(
-                "INSERT INTO dependencies VALUES (?,?,?)",
-                [(spec.study_id, spec.task_id, dep) for dep in spec.dependencies],
-            )
+            self._add_task_in_transaction(spec)
         return self.task(spec.task_id)
+
+    def _add_task_in_transaction(self, spec: TaskSpec) -> None:
+        """Trusted insertion shared with planner receipt commit; caller owns transaction."""
+        if not self.connection.in_transaction:
+            raise ARFError("task insertion requires a transaction")
+        if spec.study_id != self.study()["study_id"]:
+            raise ARFError("task study_id must match the database study")
+        rows = self.connection.execute("SELECT task_id FROM tasks").fetchall()
+        graph: dict[str, list[str]] = {row["task_id"]: [] for row in rows}
+        if spec.task_id in graph:
+            raise ARFError(f"task already exists: {spec.task_id}")
+        if spec.task_id in spec.dependencies:
+            raise ARFError("self-dependency is a cycle")
+        if any(dep not in graph for dep in spec.dependencies):
+            raise ARFError("dependencies must reference existing tasks in the same study")
+        for row in self.connection.execute("SELECT task_id, prerequisite_id FROM dependencies"):
+            graph[row["task_id"]].append(row["prerequisite_id"])
+        graph[spec.task_id] = spec.dependencies
+        check_acyclic(graph)
+        self.connection.execute(
+            """INSERT INTO tasks(study_id,task_id,title,description,kind,input_json,status,created_at)
+               VALUES (?,?,?,?,?,?,'pending',?)""",
+            (spec.study_id, spec.task_id, spec.title, spec.description, spec.kind,
+             json_text(spec.input), utc_now()),
+        )
+        self.connection.executemany(
+            "INSERT INTO dependencies VALUES (?,?,?)",
+            [(spec.study_id, spec.task_id, dep) for dep in spec.dependencies],
+        )
 
     def _task_view(self, row: sqlite3.Row) -> dict:
         result = dict(row)

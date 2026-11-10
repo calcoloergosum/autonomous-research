@@ -1,4 +1,158 @@
-# Current state — VS-001 completed; VS-002 approved for implementation
+# Current state — VS-002 implemented and verified
+
+**As of 2026-11-10:** VS-002 implements the human-approved B/B/A/A choices
+(ADR-012–015) within `tasks/VS-002.md`. VS-001 remains operational on schema
+v1 and migrated v2 databases. This is an offline plumbing demonstration, with
+no substantive research, live model calls, automatic authorization, external
+spending, network calls, or generated-code execution. No study charter or old
+example fixture was edited. The three pre-existing untracked files
+`START_HERE_KO.md`, `WORKFLOW.md`, and `docs/roadmap.md` remain untouched.
+
+## Implemented VS-002 behavior
+
+- `docs/interfaces-vs002.md` was written before service implementation. It
+  specifies the additive CLI JSON/error contracts, canonicalization, limits,
+  migration, audit records, freshness, deduplication and restart behavior.
+- `arf/plan_store.py`: explicit, transactional schema v1 → v2 migration;
+  known-schema verification; original row/identity preservation; immutable
+  contexts, requests, outcomes, proposals, decisions and import receipts;
+  foreign keys and uniqueness constraints; consistent complete context export.
+- `arf/plan_models.py`: strict bounded UTF-8/JSON validation, duplicate-key and
+  nonfinite-number rejection, depth scan before parsing, normalized TaskSpec
+  defaults and sorted reference/dependency sets; separate content/action hashes.
+- `arf/planner.py`: data-only provider protocol and deterministic versioned mock
+  for task, question/hypothesis note, no-action and controlled invalid output.
+  It receives immutable context/request/prompt data without a Store, executor,
+  tool or approval capability. No provider adapter or dependency was installed.
+- `arf/planning.py`: durable request-before-invocation ordering; raw response and
+  prompt provenance; idempotent completed-request replay; a separate planner
+  lock; explicit review-required outcomes for uncertain/incomplete requests.
+  Invalid responses retain bounded diagnostics/raw prefixes and never tasks.
+- `arf/plan_policy.py`, `arf/authorization.py`: versioned local policy identity,
+  a separate trusted operator decision interface, exact approval binding, strict
+  first-approval/import freshness and atomic task/receipt commit. Import replays
+  a committed receipt before freshness/policy checks, never execution or retry.
+- `arf/cli.py`: `plan migrate/export/propose/list/show/decide/import`. Existing
+  VS-001 command arguments/JSON/error behavior remain intact. `arf/store.py`
+  accepts v2 and shares only task insertion internals with the importer; the
+  fixed worker, executor, claim/finalize and recovery code are unchanged.
+- `tests/test_planning.py`: 101 VS-002 acceptance/error cases. The original
+  Store-based tests in `test_lifecycle.py` and `test_validation_cli.py` now run
+  against both v1 and v2 through `tests/conftest.py` (47 additional regression
+  cases). The existing schema assertion checks the assigned version rather than
+  hardcoding v1; all previous behavioral assertions remain.
+
+## Verification actually observed
+
+Used the existing offline environment (`source .venv/bin/activate`), without
+installing packages or accessing a network. Python 3.12.3, SQLite 3.45.1,
+PyYAML 6.0.1 and pytest 9.1.1 remain the available environment.
+
+| Command | Observed result |
+| --- | --- |
+| `python -m pytest -q` before implementation | 74 passed in 2.71s |
+| `python -m pytest -q tests/test_planning.py` initial acceptance suite | 88 passed in 3.05s |
+| `python -m pytest -q` with dual-schema regression coverage | 209 passed in 7.85s |
+| `python -m pytest -q tests/test_planning.py` after input/binding cases | 100 passed in 3.16s |
+| `python -m pytest -q` final source/test suite | **222 passed in 7.97s** |
+| `git diff --check` | Exit 0, no whitespace errors |
+| Explicit trailing-whitespace check of eight new deliverables | Passed |
+
+Coverage includes populated migration and exact old row/charter preservation,
+no-op/unknown/unrelated schemas, simulated migration interruption/rollback,
+consistent snapshots during concurrent writes, complete oversized-export refusal,
+restart idempotency, approval/import staleness after task/run/recovery/retry
+changes, malformed/forged/prohibited responses, SQL immutability and FK bindings,
+action deduplication independent of rationale, manual task collisions, receipt
+rollback, concurrent import/propose, policy changes, uncertain planner outcomes,
+inert ideas, and network-denied mock calls. Failed imported tasks also replay
+receipts without retrying, even after policy changes.
+
+### Separate-process offline demonstrations
+
+The extended workflow ran **41 separate CLI processes**, with assertions on
+actual exit codes and outputs. Database: `.local/vs002-verified.rao6zhv5/arf.db`.
+Local `transcript.json` and `summary.json` alongside it preserve commands,
+stdout/stderr and observed outcomes; these local artifacts are Git-ignored.
+
+1. Imported the unchanged demo charter, created/executed the original task in
+   v1, captured all historical rows, migrated and checked exact preservation.
+   Second migration returned `already_current`.
+2. Exported context
+   `775c1afad100fab967449ee948982688bfc01723084cbb007ae4b3c1cc8b5258`.
+   Propose/replay linked one proposal without execution-state writes. Unapproved
+   import exited 1 with `unauthorized`. The proposal was
+   `proposal-301409d68cdd76f1992f61d2e8925a2f75e82b1b494c543dec58cb333c906051`.
+3. Explicit local-demo approval/replay returned the identical decision. Import
+   created one pending task with no run; a separate `run-next` returned
+   `{"mean":5.0,"count":4}`. Measured wall times were
+   0.024693643674254417 seconds (original task) and 0.02135372720658779 seconds
+   (imported task). These are observed durations, not cost predictions.
+4. Replayed decisions/receipts across process restarts and after execution;
+   no duplicate task/run/evidence was created. A separate manual demo task
+   changed state: first import of an approved second candidate exited 1 with
+   `stale_context`. Another candidate became stale when that manual task ran;
+   first approval exited 1 with `stale_context`. The original receipt still
+   replayed successfully.
+5. Persisted note/no-action proposals and refused their imports. Final extended
+   state: three tasks, three runs, three **unvalidated** observations (original,
+   imported, manual freshness fixture); two stale candidates remained inert.
+   Recovery reported no interruptions; final run-next returned `no_ready_task`.
+   All pre-migration historical rows and the entire study row remained intact.
+
+The exact runnable README demo was also executed from its code block against
+fresh `.local/vs002.29CW7Q/arf.db`. Commands ran with immediate failure checks,
+except the intentionally denied import, whose failure was explicitly expected.
+It finished with two successful tasks and two unvalidated observations,
+identical decision/receipt replays, and `no_ready_task`. Its local
+`readme-stdout.jsonl` / `readme-stderr.txt` preserve the output.
+
+Both demonstrations retained charter bytes and SHA-256
+`d33806961b80d24f57c72792f9511f29432eb25533990db1aa1cd1ea77dd95e9`.
+All evidence labels remained `unvalidated`; planner usage is unknown/null and
+no live provider costs are claimed. Existing fixed-worker zero usage fields and
+null CPU measurements were retained. These demonstrations establish no
+scientific progress.
+
+## Reversible defaults and limitations
+
+The implementation follows the approved task without an additional architectural
+decision requiring review. The detailed local defaults are normative in
+`docs/interfaces-vs002.md`: UTF-8 canonicalization/export v1; depth 32;
+1 MiB contexts, 64 KiB raw responses, 4 KiB text, 64 references/dependencies;
+hash-derived proposal identity and independent full-TaskSpec action identity.
+Task fixtures derive an ID from a context-hash prefix; notes derive their kind
+from request identity. Distinct task IDs remain distinct proposals, without
+scientific-equivalence detection. Identical decisions replay; conflicting ones
+fail. Rejection is terminal and does not require fresh state.
+
+Migration deliberately refuses customized/unknown schemas; it never silently
+adopts an unrelated database. Planning artifacts/outcomes are append-only rather
+than overwriting lifecycle fields. An interrupted request is review-required;
+there is no automatic recall/retry or recovery-clearance API. Invalid/request-only
+outcomes are inspectable with the internal request API/SQLite; CLI list/show
+cover valid proposals and their provenance. Export fails on oversized complete
+state rather than summarizing or dropping evidence. Strict freshness can require
+new proposals after unrelated execution changes.
+
+Operator identity is locally asserted, without authentication. The provider
+protocol is a capability separation within trusted installed Python code, not an
+OS sandbox for arbitrary provider implementations. Host owners remain trusted;
+SQL/hash checks do not protect against owners replacing code or databases.
+Locks are single-host POSIX advisory locks; use a canonical local DB path and
+retain lock files. Existing hardlink/network-filesystem, crash/orphan-child,
+exactly-once and database-owner limitations from VS-001 still apply. No general
+resource scheduler, untrusted-code sandbox, live provider, autonomous research
+loop, strong identity, scientific evidence promotion, or next milestone is
+implemented or authorized by this work.
+
+The following history records earlier VS-001 work and pre-implementation
+planning statements. Its statements that VS-002 was pending or required design
+selection are superseded by ADR-012–015 and the verified implementation above.
+
+---
+
+## Historical VS-001 handoff (before the VS-002 implementation)
 
 **As of 2026-11-10:** The human owner approved the VS-002 design choices B/B/A/A and authorized an offline implementation task (ADR-012–015; `tasks/VS-002.md`; Codex handoff `prompts/codex-vs002.md`). **VS-002 has not been implemented or tested.** Live LLM calls and automated authorization remain forbidden.
 
