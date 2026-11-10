@@ -116,7 +116,7 @@ The trusted controller publishes manager priorities automatically without per-ro
 2. Enter `BEGIN IMMEDIATE`; identical dispatch request replay returns its recorded result before recomputing selection or retrying physical execution.
 3. Refuse when another attempt is running. Capacity busy or interrupted is distinct from no research tasks being ready.
 4. **Independently enumerate the authoritative set of admitted, pending, dependency-ready tasks**, with worker/constraint eligibility. Do not derive this set from the manager's recommendation list. Record whether no pending work exists, tasks are dependency-blocked, or resource constraints prevent execution; none implies study completion.
-5. If ready work exists, verify the current controller-published manager decision and freshness in the same transaction. Select the highest-ranked actually eligible mapped task, skipping blocked candidates and recording blockers. If ranking is absent, stale, incomplete or omits all ready tasks, seek an explicit **bounded** manager re-evaluation or record `decision_unavailable`—never `no_ready_task` or FIFO fallback. Distinguish a deliberate, reasoned `abstain` from a recommendation generation failure. No unbounded retry loop.
+5. If ready work exists, verify the current controller-published manager decision, its **recorded selective reuse/replanning decision**, and task eligibility inside the claim transaction. One recommendation can guide several claims. Unknown or critically invalid premises trigger bounded reassessment or `decision_unavailable`, not false `no_ready_task` or FIFO. Deliberate `abstain` differs from generation failure. Do not run expensive manager/policy logic under the claim transaction or loop unboundedly.
 6. Commit the ordinary task pending→running transition, run row and a dispatch receipt atomically. The receipt binds decision/version, task/spec/run, preclaim freshness, eligibility audit, skipped entries and scheduling version. A failure inserting the receipt rolls back the claim.
 7. Run the fixed worker through the existing execution/finalization body outside the transaction under the controller lock. Never call a model/policy within the claim transaction or let the manager claim tasks directly.
 
@@ -147,7 +147,7 @@ outside the existing reliability model.
 | V4-1 | One complete offline round plus real ranked claim and fixed-worker execution | Advisory-only omits the requested execution ordering; unattended autonomy broadens scope |
 | V4-2 | New versioned advisory identities with exact graph/proposal origins and optional verified stored-task bindings | Reusing proposal IDs confuses approval with valuation; requiring graph nodes creates unnecessary graph writes |
 | V4-3 | **ADR-026:** preserve reasoned, qualitative/uncertain/incomparable impact assessment separately from information proxies and cost vector | Do not require a universal numerical impact score; synthetic policy arithmetic is only a test fixture |
-| V4-4 | Static baseline and one deterministic information-aware function with explicit synthetic utility | UCB/Thompson/VOI need additional reward/posterior assumptions; no universal winner is selected |
+| V4-4 | Static ordering and optional information-aware arithmetic for **synthetic test utility only**, with separately inspected qualitative scientific reasons | UCB/Thompson/VOI need unvalidated reward/posterior assumptions; no general scientific impact formula |
 | V4-5 | Separate immutable context containing selected graph and exact execution component | Ephemeral inputs complicate replay; modifying plan export would change authorization hashes |
 | V4-6 | Explicit additive SQLite v4; six substantive tables, embedded estimate/configuration payloads | Sidecars complicate atomic claim/audit; stateless tests cannot preserve decision/dispatch history |
 | V4-7 | **ADR-027 preferred:** retain recommendations for multiple claims when the Replanning Policy finds relevant premises still valid; explicitly record reuse/recompute/defer | Do not force full reevaluation after every run or ignore newly relevant evidence |
@@ -176,7 +176,7 @@ Example: a ranked child C depends on ready unranked prerequisite P. P belongs in
 
 ### V4-13 automatic priority selection
 
-**Accepted:** a trusted controller can publish the manager's versioned, provenance-bound ranking automatically; no operator clicks or manual activation for every new decision. Model output is data, not a task-claim or approval capability. Existing manual task admission and operator approval/import remain unchanged. Dispatch still requires its own explicit trigger; saving a ranking does not start work.
+**Accepted:** a trusted controller can publish the manager's versioned, provenance-bound ranking automatically; no operator clicks or manual activation for every new decision. **ADR-027:** the same rank may remain usable across multiple independently checked claims. Model output is data, not a task-claim or approval capability. Existing manual task admission and operator approval/import remain unchanged. Dispatch still requires its own explicit trigger; saving a ranking does not start work.
 
 **Still undecided:** the exact publication interface, whether saving and publication are one transaction, handling of competing decisions/selection heads, and lifetime of one saved ranking across multiple claims. One-claim activation remains an unapproved, reversible recommendation.
 
@@ -320,7 +320,7 @@ improvement nor a regret calculation validates an empirical research policy.
 | Blocked child ranks first, ready mapped task second | Skip child and dispatch second; record blockers |
 | Only unranked prerequisite is ready | Authoritative ready scan finds P; manager must re-evaluate P or report a recommendation problem, not `no_ready_task`; no silent FIFO promotion |
 | New evidence or unrelated graph correction after publication | Strict stale refusal; obtain an updated manager recommendation automatically at the next explicit decision round |
-| Worker result committed after a first ranked claim | Old activation consumed and snapshot stale; no second claim from it |
+| Worker result committed after first ranked claim | Scheduler may reuse **the same recommendation** for a subsequent task only after a recorded relevance/replanning check and current authoritative readiness validation, otherwise replan/refuse |
 | Automatic publication races with dispatch or another publication | Expected-head check plus one write transaction; each dispatch records the selection head actually used |
 | Failure between run insert and dispatch receipt | Whole claim transaction rolls back |
 | Lost response after committed claim | Identical request returns history; does not start worker again, even if no worker actually started |
@@ -336,14 +336,14 @@ the application, not a sandbox for arbitrary plugins or generated Python.
 
 ## 9. Recommended implementation scope and acceptance
 
-After approval only: implement bounded versioned contexts/candidates/estimates, one static and one feedback-dependent deterministic policy, controller-validated **automatic priority publication**, a narrow ranked dispatch claim, audit/replay/inspection and offline fixtures. A proposed one-claim ranking lifetime should be evaluated explicitly. No production model, unattended trigger, scheduler-wide rewrite, multi-resource capacity engine or VS-005 dashboard.
+After approval only: implement bounded versioned contexts/candidates/judgments/cost estimates, synthetic reference policies, automatic priority publication, **versioned selective Replanning Policy**, a reusable ranking with per-claim audit, narrow ranked dispatch, replay/inspection and offline fixtures. No production model, unattended trigger, scheduler-wide rewrite, multi-resource capacity engine or VS-005 dashboard.
 
 The [draft](VS-004.md) maps D1–D13 to concrete tests. Require at minimum:
 
-1. Admitted ready A precedes B by FIFO, but the manager ranks B before A; an explicitly requested dispatch actually runs B with a receipt, without any operator activating each ranking.
+1. Admitted ready A precedes B by FIFO, but manager ranks B before A; dispatch runs B and the *same* ranking may guide a **second claim** after a recorded applicability/replanning check, without per-round human activation.
 2. A higher-ranked child blocked on dependency does not run; an unranked ready prerequisite **is discovered by the independent ready scan**, then causes manager re-evaluation or a visible recommendation failure, not a false `no_ready_task`.
 3. No registered ready task means no dispatch and a clear reason; ready tasks with missing/stale/abstaining/incomplete rankings yield distinct results; no FIFO fallback and no invented research-complete claim.
-4. Two concurrent claimers, automatic preference changes, writer-vs-claim races, claim/receipt atomicity, interruption/restart, and replay never duplicate an attempt.
+4. Two concurrent claimers, automatic preference/replanning changes, writer-vs-claim races, claim/receipt atomicity, interruption/restart, and replay never duplicate a run or silently replace a historical recommendation.
 5. Multi-round feedback with new candidate D, counterfactual, cost surprise, baseline change only through existing operator fixtures, and an adverse information-policy case.
 6. Populated migration and exact v1–v3 preservation, all previous tests and offline demos.
 
@@ -356,10 +356,10 @@ This design-only document introduces no VS-004 test result.
 **Still to review before implementation:**
 
 - V4-11: internal ranked-dispatch API and v4 handling of legacy FIFO entry points.
-- Strict graph-sequence plus complete execution freshness, one-claim versus multi-claim ranking lifetime, and automatic publication atomicity, refresh/head-conflict policy.
+- **Selective premise validity** versus conservative change detection, multi-claim recommendation lifetime and versioned Replanning Policy with bounded evaluation cost; publication atomicity and head-conflict handling.
 - Additive v4 ledger/reference semantics, context snapshot and migration compatibility.
 - Truncated/partial context and unknown-resource treatment with the existing fixed-worker execution profile.
-- Synthetic estimator/policy versions, limits and the D1–D13 test contract.
+- Synthetic estimator/policy versions, **qualitative impact judgments**, Replanning Policy/reuse audit, limits and revised D1–D13 test contract.
 
 Human approval of these technical selections is still required before coding. The accepted V4-12/13 principles do **not** authorize live models, task admission changes, background worker triggers, spending or an implemented VS-004.
 
