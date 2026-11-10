@@ -156,7 +156,7 @@ outside the existing reliability model.
 | V4-10 | Multi-round deterministic fixture, adverse cases, replay and real-worker plumbing, plus all legacy regressions | Synthetic improvement cannot establish calibrated predictions or effective real research allocation |
 | V4-11 | Separate internal v4 dispatch; v1–v3 keep FIFO; v4 legacy FIFO entry points refuse | Automatic v4 `run-next` ranking hides schema-dependent behavior; a mode flag adds mixed-mode semantics; leaving FIFO on v4 is an explicit bypass option |
 | V4-12 | **ACCEPTED (ADR-025):** check authoritative full ready set first. If zero, do not run; if ready tasks exist but ranking cannot select one, re-evaluate or report recommendation failure; reasoned abstention is distinct. No hidden FIFO fallback | May stall when manager cannot rank a ready prerequisite; do not mislabel this as no work or infer scientific completion |
-| V4-13 | **ACCEPTED (ADR-024):** manager automatically updates order and trusted controller publishes verified scheduling preference without per-round human activation; never grants admission or execution | Publication atomicity, refresh and one-claim lifetime are still open technical details, not permission to auto-run workers |
+| V4-13 | **ACCEPTED (ADR-024):** manager automatically updates order and trusted controller publishes verified scheduling preference without per-round human activation; never grants admission or execution | Publication atomicity, refresh, selective replanning and **multi-claim validity mechanics** remain under review; publication never auto-starts a worker |
 
 ### V4-11 interface comparison
 
@@ -178,7 +178,7 @@ Example: a ranked child C depends on ready unranked prerequisite P. P belongs in
 
 **Accepted:** a trusted controller can publish the manager's versioned, provenance-bound ranking automatically; no operator clicks or manual activation for every new decision. **ADR-027:** the same rank may remain usable across multiple independently checked claims. Model output is data, not a task-claim or approval capability. Existing manual task admission and operator approval/import remain unchanged. Dispatch still requires its own explicit trigger; saving a ranking does not start work.
 
-**Still undecided:** the exact publication interface, whether saving and publication are one transaction, handling of competing decisions/selection heads, and lifetime of one saved ranking across multiple claims. One-claim activation remains an unapproved, reversible recommendation.
+**Still undecided:** the exact publication interface, whether saving and publication are one transaction, handling of competing decisions/selection heads, and lifetime of one saved ranking across multiple claims. One-claim activation remains a conservative historical alternative, **not the preferred ADR-027 multi-claim direction**.
 
 ## 5. Proposed persistent data model
 
