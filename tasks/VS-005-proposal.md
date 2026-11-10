@@ -180,24 +180,26 @@ Use the **existing v4 offline synthetic fixture** as read-only input, including 
 
 This scenario deliberately uses records that exist **today**. It must not depend on P2 being implemented or infer final study success. A v4 dispatch with `needs_decision / unranked_ready_task` should be displayed as an actual recorded nonexecuting result, not rewritten as an imaginary recommendation. The demo is an engineering observation, not scientific certification.
 
-## 9. Proposed acceptance matrix (O1–O12; not approved)
+## 9. First-slice acceptance matrix (O1–O10; proposed, NOT approved)
+
+These criteria **verify one decision-audit journey**, not the completeness of a generic research dashboard.
 
 | ID | Observable acceptance requirement |
 | --- | --- |
-| O1 — Read-only boundary | No mutating HTTP route/callback; all DB connections `mode=ro` + query-only; attempts to write fail; no migration, worker or controller-lock acquisition by observer |
-| O2 — Local isolation | Bind 127.0.0.1 only; Host/origin/CORS/CSP controls; no external asset/network/dependency fetch; source research text never becomes executable script |
-| O3 — Single workspace | One shared selection/Inspector across Map, Decisions and Execution lenses; focus/filters retained on switch |
-| O4 — Provenance | Task→candidate→decision→assessment→dispatch→run/Evidence chain follows actual stored keys; missing links explicitly marked `not_recorded` |
-| O5 — Graph fidelity | Typed semantic/derived/operator-transition edges, revisions, unreviewed status, bounds and frontier; no inferred scientific causal claims |
-| O6 — Historical honesty | Pinned decision context exact; graph-as-of separate; current task statuses never masquerade as past statuses; unsupported comparisons labeled |
-| O7 — Change comparison | Two checkpoints compare candidate/rank/reason changes and detect selection-scope differences/incomparable items |
-| O8 — Full decision trace | Ranked, excluded, unranked, unmapped, abstained, reused and replanned records visible with source policy and synthetic impact disclaimer |
-| O9 — Execution fidelity | Current readiness/blockers and immutable run/evidence history, with predicted vs observed cost and unknown/null preserved |
-| O10 — Live update | Test writer changes graph, task/run and decision records; polling detects each, preserves selection/layout; Historical View stays pinned; server restart resyncs safely |
-| O11 — Bounded operation | Large graph/context, malformed IDs, many timeline events and busy/locked DB return bounded pages/errors and never silently truncate historical evidence |
-| O12 — Compatibility and reproducibility | Existing VS-001–004 tests/demos unchanged, no v4 schema change, observer browser+server tests and an end-to-end read-only scenario pass; no VS-005 actions created by reading |
+| O1 — Genuine read-only | All SQLite observer reads use a dedicated `mode=ro`, `query_only=ON` connection and bounded read transactions. No mutating routes, migrations, worker/claim/approval/retry/baseline calls or DB-content changes even under malformed requests. |
+| O2 — Local-only security | Bind `127.0.0.1`; Host and same-origin/CSP safeguards; no permissive CORS, CDN or external asset fetching. Render untrusted research text safely, never as HTML/script. |
+| O3 — One complete journey | On the existing fixture, select Task B / its dispatch and follow the documented Why? trace to candidate, decision, alternatives, stored assumptions/context, run and Evidence **without leaving the workspace**. |
+| O4 — Source fidelity | Every displayed relationship is backed by a stored key/type or explicitly `not_recorded`. Semantic motivation, execution fact, operator transition and unreviewed interpretation are not collapsed into causal or validated scientific truth. |
+| O5 — Temporal honesty | Pin an exact decision checkpoint and distinguish its saved execution snapshot from current task state and optional Graph as-of projection. No fabricated whole-study time travel. |
+| O6 — Minimal comparison | Compare initial and later fixture decisions on membership, rank/exclusion, policy, available cost/uncertainty and changed context scope. Different scope and unknown history must be reported, not scored as progress. |
+| O7 — Automatic refresh without focus loss | A separate trusted writer updates Graph/Run/Decision in a test DB; polling detects change and updates Live while retaining selection/scroll. Pinned checkpoint does not jump forward; server restart and disconnection resynchronize or visibly mark stale. |
+| O8 — Bounded reads | Large datasets, context limits, malformed IDs, oversized results and DB busy/error yield explicit bounded pages/typed failures; no silent dropping of evidence or unbounded server queries. |
+| O9 — Stable artifact/UX | A compact recent list + Why? trace + Inspector/Checkpoint prototype is navigable by keyboard; main explanations can be found without a full graph renderer or a speculative nine-route service. |
+| O10 — Compatibility | Zero v4 schema mutations; original VS-001–004 tests and demos remain unchanged; observer server/browser integration and restart demos pass; execution is triggered **only by external trusted writer**, never the viewer. |
 
-For O10, a test that modifies a fixture database must use a **separate trusted writer process** and demonstrate that the observer itself performed no write.
+The **first completion test** is a narrated, reproducible B → rationale/alternatives → observed E → checkpoint → later D comparison with a read-only local UI. Browser screenshot similarity to a mockup is *not* a substitute for validating data provenance, selection persistence or observed refresh behavior.
+
+Any fixture modifications for O7/O10 must be performed by a **separate authorized writer process** and must not be mistaken for observer writes.
 
 ## 10. Risks and deliberately deferred scope
 
@@ -211,22 +213,31 @@ For O10, a test that modifies a fixture database must use a **separate trusted w
 
 Defer UI edits, authorization, manual annotations, task admission, approval, run/retry, remote hosting, multi-user collaboration, push/WebSockets, notifications, report export, automatic scientific review, source-code execution, new research policies and true whole-study time travel.
 
-## 11. Design alternatives requiring explicit human review (V5-1–V5-9)
+## 11. Human review decisions for the revised slice (V5-1–V5-9)
 
-| ID | Choice | Tentative preference | Alternatives / risk |
+The observation-only/local/live product direction is already selected by the human owner. Everything below is a **proposed implementation/design choice**, not yet an accepted ADR.
+
+| ID | Question | Refined preference | Alternative / consequence |
 | --- | --- | --- | --- |
-| V5-1 | Primary layout | Single Research Explorer + stable Inspector + thin checkpoint/event rail | Three unrelated dashboards duplicate navigation and state |
-| V5-2 | UI view selection | Map/Decisions/Execution **lenses** share one typed selection | Separate routes/pages need explicit preserved navigation context |
-| V5-3 | Historical model | Decision checkpoint is primary; graph-as-of separately labeled | One universal time slider would falsely imply full execution history |
-| V5-4 | Refresh mechanism | HTTP poll approximately 3 s; persistent read-only `data_version` detector + observer epoch | WebSocket/SSE adds lifecycle complexity; naive graph seq/file mtime misses changes |
-| V5-5 | Server stack | Local Python stdlib + bounded GET APIs and bundled static assets | FastAPI/framework dependency or static non-live export |
-| V5-6 | Frontend/graph | Small locally bundled JS/SVG, bounded focus-first layout | A pinned local graph library if simple prototype underperforms |
-| V5-7 | Supported schemas | Explicit **v4-only** full Observatory for first slice; no silent migration | Reduced v3 view could be a follow-up; inventing partial decision history is risky |
-| V5-8 | Privacy/security | Loopback-only, read-only SQLite, Host/origin/CSP/same-origin and no external assets | Session token may be warranted; choose after threat review |
-| V5-9 | Query/payload limits | Reuse bounded existing graph, ledger and context contracts; add small per-API page/response limits | Relax limits only with measurements; never silently drop evidence |
+| V5-1 | What is the first valuable product? | **One B → Why? → Evidence → Decision comparison journey**, not three complete dashboards | Building all lenses at once creates breadth without validating understanding |
+| V5-2 | What is the minimal UI structure? | Recent selections + central Why? trace + persistent Inspector with a two-checkpoint comparison | Full Map/Decisions/Execution tabs deferred until interaction evidence supports them |
+| V5-3 | How is historical truth represented? | **Two** top-level modes: Live and pinned Decision checkpoint; graph-as-of is explicitly a narrower data view | A universal timeline falsely reconstructs historical task state |
+| V5-4 | How does live refresh work? | Poll ~3 s using a persistent read-only SQLite connection's `data_version`, process epoch and bounded re-fetch | Push sockets or global file timestamp checks add complexity or miss WAL commits |
+| V5-5 | What runs the local observer? | Small Python stdlib loopback HTTP process, no separate DB schema or writer-enabled Store | Framework dependency may help later but widens attack/build surface |
+| V5-6 | What draws the first trace? | Bundled HTML/JS and tiny source-linked trace/list or mini-DAG; no general force-layout engine | Pinned graph library after a real usability prototype, if justified |
+| V5-7 | Which DBs are supported? | Initially v4 only, explicit unsupported older-schema message; do not auto-migrate | Reduced v3-only feature mode is a separate later capability |
+| V5-8 | Which security guarantees? | DB `mode=ro` + `query_only`, no mutating routes, loopback Host/origin/CSP, local assets and safe text rendering | Session-token requirement requires a concrete threat and design review |
+| V5-9 | How much read API do we commit to? | **Prototype first; approximately five bounded GET capabilities** (meta/overview/trace/checkpoint/changes) | A fixed nine-resource public API prematurely creates compatibility debt |
 
-## 12. Suggested next step
+**Compatibility note:** no authority to alter VS-004 dispatch, admission, Replanning Policy or P2 handling. New v4/bootstrap revisions should be displayed using their actual persisted records. No Observatory schema migration or UI annotations in this slice.
 
-Have the human owner review V5-1–V5-9. Then convert the accepted choices into ADRs and a **smaller, normative `tasks/VS-005.md`**, plus a proposed HTTP/temporal contract before assigning Codex implementation. A quick static prototype using the saved VS-004 offline fixture can validate whether the Inspector and Checkpoints communicate the right information—without adding a production UI, migration or execution capability.
+## 12. Next design checkpoint
+
+1. **Review V5-1–V5-9** and keep only decisions required for the first decision-audit journey.
+2. Exercise a **tiny static interface prototype** over the existing VS-004 B/A/C/D fixture shape: choose B, inspect its decision and E, pin the initial context, compare with the D decision, and test what cannot be linked. This is a product-design validation, not code authorization.
+3. Record what the prototype proves necessary. Only then write a **small approved `tasks/VS-005.md` and versioned local read/temporal contract**. If a generic graph endpoint or search becomes necessary, justify it with a failed user-journey test rather than speculative architecture.
+4. Have Codex implement and verify the bounded read-only server, small browser UI and auto-refresh without changing any existing Research Manager, Scheduler or DB migration contracts.
+
+**This proposal remains a proposal.** The first implementation is valuable when a researcher can understand an AI choice and its uncertainty—not when an elaborate dashboard merely displays more nodes.
 
 **This proposal is not permission to implement VS-005.**
