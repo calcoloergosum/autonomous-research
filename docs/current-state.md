@@ -1,3 +1,11 @@
+# Current state — VS-003 verified; VS-004 design under review
+
+**VS-004 design status (2026-11-10):** The human owner approved two behavioral directions, now recorded as ADR-024–025 in `docs/decisions.md`: **V4-13** Research Manager automatically sets/updates priority of previously admitted work without per-round human activation; **V4-12** the scheduler independently checks *all* registered ready tasks before stopping, distinguishes genuine no-ready from recommendation failure and deliberate deferral, and never silently falls back to FIFO. See `tasks/VS-004-proposal.md`, `tasks/VS-004-technical-review.md`, and the still **DRAFT, NOT APPROVED** `tasks/VS-004.md`.
+
+**No VS-004 implementation has been authorized or performed by this update.** Existing `run-next` remains FIFO; actual v4 dispatch API, ranking publication/lifetime, freshness, schema and policy contracts remain subject to human review. No new VS-004 tests were run.
+
+## Historical VS-003 implementation verification
+
 # Current state — VS-003 final review corrections verified
 
 **As of 2026-11-10:** Both implementation-review findings (P1 ownership and
