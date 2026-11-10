@@ -1,3 +1,11 @@
+# Current state — VS-003 verified; VS-004 approved, implementation pending
+
+**VS-004 implementation authorization (2026-11-10):** The human owner approved the bounded offline VS-004 task in `tasks/VS-004.md` and V4-11's **same `run-next` interface**: v1–v3 preserve FIFO and exact previous CLI behavior, while explicitly migrated v4 uses Research Manager-ranked dispatch without changing task admission, the worker allowlist or the manual execution trigger (ADR-028–029). ADR-026 forbids treating scientific impact as a fully computable universal score. ADR-027 favors a reusable recommendation across multiple claims, with separately recorded selective and cost-aware replanning instead of automatic expiry on every execution-hash change.
+
+**VS-004 HAS NOT BEEN IMPLEMENTED OR TESTED by this documentation update.** No v4 tables, decision service, Replanning Policy or v4 `run-next` code has been added. Implementation is authorized only for offline deterministic fixtures and verification; no live models, spending, generated code execution, new workers, scientific certification or VS-005 interface. Earlier technical-review proposals suggesting a separate v4 entry point or one-claim lifetime are superseded by `tasks/VS-004.md`.
+
+## Historical VS-004 design decisions and VS-003 verification
+
 # Current state — VS-003 verified; VS-004 design under review
 
 **VS-004 design status (2026-11-10):** The human owner approved two behavioral directions, now recorded as ADR-024–025 in `docs/decisions.md`: **V4-13** Research Manager automatically sets/updates priority of previously admitted work without per-round human activation; **V4-12** the scheduler independently checks *all* registered ready tasks before stopping, distinguishes genuine no-ready from recommendation failure and deliberate deferral, and never silently falls back to FIFO. See `tasks/VS-004-proposal.md`, `tasks/VS-004-technical-review.md`, and the still **DRAFT, NOT APPROVED** `tasks/VS-004.md`.
