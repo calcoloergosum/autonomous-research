@@ -1,6 +1,6 @@
 # VS-004 internal decision and ranked dispatch contract (v1)
 
-This additive offline contract implements ADR-024–029. These encodings and
+This additive offline contract implements ADR-024–030. These encodings and
 synthetic policy constants are reversible engineering defaults. V1–v3 CLI,
 errors, FIFO, context export, approval and import stay unchanged. Init stays v1.
 No network, model, new worker, task admission, baseline authority or scientific
@@ -60,7 +60,7 @@ refuses without dropping evidence. Inspection is by exact ID or bounded page.
   revision requires current expected prior. Bindings are separate candidate-origin
   key -> existing task ID. Source payload cannot supply executable binding.
 - `decide(request_id, context_id, candidates, policy, constraints, actor,
-  previous_decision_id=None)`: exact version pairs and pure fixture estimator/
+  previous_decision_id=None, controller_profile=None)`: exact version pairs and pure fixture estimator/
   policy; stores full membership atomically. No execution. `publish` validates
   saved inputs/bindings and current snapshot/head before appending an automatic
   controller publication; no operator activation. `run-next` automatically
@@ -173,7 +173,7 @@ Nonclaim responses (exit 0) contain exactly `status`, `reason`, `dispatch_id`,
 | --- | --- |
 | review_required | unfinished_attempt |
 | no_ready_task | empty_queue or prerequisites_blocked |
-| needs_decision | missing, critical_invalidity, unranked_ready_task, no_ranked_ready_task, state_changed |
+| needs_decision | missing_candidates, policy_unconfigured, critical_invalidity, unranked_ready_task, no_ranked_ready_task, state_changed (historical receipts may retain missing) |
 | deferred | reasoned_abstention or assessment_budget |
 
 Audit contains authoritative ready IDs and blockers, never a study_complete claim.
@@ -201,3 +201,66 @@ unmapped idea, a high-priority blocked task, counterfactual feedback and a
 misleading information bonus remain inspectable. Truncation ends in deferred
 with real ready work. Synthetic payoffs never enter observation tables or policy
 inputs. Inspection starts a separate process and performs no dispatch.
+
+## ADR-030 initial recommendation bootstrap (offline profile v1)
+
+On v4, after receipt replay, unfinished-capacity and authoritative ready-set
+checks, an absent publication invokes one bounded initial-manager attempt outside
+any claim transaction. Zero registered heads returns `needs_decision /
+missing_candidates`. No tasks, candidates, approvals, imports or relevance rules
+are synthesized. Empty/blocked queues keep the existing no-ready outcomes and
+never compute a ranking. Existing publications use the existing relevance path.
+The strict all-ready coverage rule is unchanged; P2 remains deferred.
+
+The trusted local `arf.bootstrap.INITIAL_PROFILE` is an installed
+`BootstrapProfile(name='offline-synthetic-initial-ranking', version=1)` containing
+exact `Policy(name='information',version=1,weight=1)` and
+`Constraints(ceilings={'synthetic_tokens':10},hard=(),currency=None)`, plus the
+existing default Selection and Feedback. This deliberately synthetic comparison
+profile is a reversible offline fixture configuration, never a scientific-impact
+formula. A missing/malformed/unsupported name/version/policy/constraints returns
+`needs_decision / policy_unconfigured`; the controller does not guess a policy.
+No new CLI flag, environment-variable selector or persistent schema is added.
+
+Trusted local fixtures may preconfigure a bounded Selection or explicit Feedback
+rules in this profile. The default Feedback has branch unknown, empty evidence,
+empty cost overrides and **no rules**. Candidate text, demo success and missing
+graph links never produce engineering_only rules. With defaults, the first
+claim can execute, but a later call seeing its new evidence conservatively
+returns `needs_decision / critical_invalidity`. Reuse requires separately
+preconfigured, spec-pinned trusted rules and a fresh recorded relevance check.
+Unmapped candidates cannot dispatch. Missing quantitative inputs/qualitative-only
+candidates or truncated context produce the existing saved abstention and
+`deferred / reasoned_abstention`; a ranked set without a mapped ready member or
+with uncovered ready work keeps the existing needs_decision reasons. Corrupt
+bindings/schema/persistence failures remain operational errors with no claim.
+
+Bootstrap captures a fresh joint context and bounded exact candidate heads,
+validates the snapshot/head manifest, records a decision and publishes it with
+expected_prior=None. Its request IDs derive from the dispatch ID with suffixes
+initial-decision and initial-publication (using the existing bounded hash rule).
+The decision's optional controller_profile metadata binds the full profile,
+source SHA-256 and configuration hash in both immutable request and result.
+Older decisions omit this key and retain their exact request/replay encoding.
+The installed execution source profile also pins bootstrap.py. Profile changes
+are not per-ranking human activation and never authorize task admission.
+
+Decision/publication persistence reuses existing transactions and receipts;
+policy inference never runs in a claim transaction. Concurrent head, candidate,
+graph or execution changes yield `needs_decision / state_changed`, or the caller
+observes the committed initial head. At most one initial publication wins CAS;
+losing immutable advisory decisions may remain, with no run. The normal final
+state/head/binding/readiness check and per-claim assessment still precede the
+atomic task/run/dispatch receipt. Controller locking spans the entire lifecycle.
+
+Publication failure rolls back its event, preserving any already committed
+advisory context/decision and creating no running task. Interruption after
+publication leaves an inspectable published ranking, never an implicit worker
+resume. A new explicit invocation follows the existing relevance/claim path.
+Committed dispatch receipts replay before bootstrap/config checks and never
+execute again. Nonclaim and claimed receipts from an initial attempt add
+`audit.bootstrap` with version=1, profile/configuration identity and any created
+decision/publication IDs. Public success/failure keys and nonclaim top-level
+shapes stay unchanged. New nonclaim reasons missing_candidates,
+policy_unconfigured and state_changed are needs_decision outcomes, never
+no_ready_task or scientific completion. V1–v3 behavior is unchanged.

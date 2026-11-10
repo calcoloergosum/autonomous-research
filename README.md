@@ -156,8 +156,14 @@ The [v4 internal contract](docs/interfaces-vs004.md) specifies the explicit
 `arf.decision_store.migrate_decisions(store)` v3→v4 migration. Init remains v1;
 old plan/graph migrations verify v4 compatibility without downgrading it.
 On v4, the existing `run-next` automatically reuses or recomputes a published
-manager ranking and claims at most one admitted ready task. Missing/unusable
-ranking returns `needs_decision`; reasoned abstention returns `deferred`.
+manager ranking and claims at most one admitted ready task. When no recommendation
+exists, registered candidates and actual ready work trigger one automatic initial
+ranking under the named offline synthetic profile.
+An empty registry returns `needs_decision / missing_candidates`; missing or
+unsupported trusted configuration returns `needs_decision / policy_unconfigured`.
+Reasoned abstention returns `deferred`. The default profile has no evidence
+relevance rules: subsequent unknown evidence conservatively requires another
+decision. Only separately trusted, preconfigured fixture rules permit reuse.
 There is no FIFO fallback or new public manager command. Saving a decision or
 publishing priority never starts work, admits tasks or changes approvals.
 

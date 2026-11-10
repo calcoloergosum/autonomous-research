@@ -14,12 +14,15 @@ def derived_id(request_id: str, suffix: str) -> str:
     return value if len(value.encode('utf-8')) <= 4096 else suffix + '-' + sha(canonical(request_id))
 
 
-def ready_audit(service: DecisionService) -> dict:
+def ready_audit(service: DecisionService, bootstrap: dict | None = None) -> dict:
     # Independent of candidate membership. The complete export cap bounds this view.
     tasks = service.store.tasks()
-    return {'ready': [t['task_id'] for t in tasks if t['status'] == 'pending' and not t['blockers']],
+    audit = {'ready': [t['task_id'] for t in tasks if t['status'] == 'pending' and not t['blockers']],
             'blockers': {t['task_id']: t['blockers'] for t in tasks if t['status'] == 'pending' and t['blockers']},
             'pending': [t['task_id'] for t in tasks if t['status'] == 'pending']}
+    if bootstrap is not None:
+        audit['bootstrap'] = bootstrap
+    return audit
 
 
 def _receipt(service, request_id, request, status, reason, audit, publication=None, assessment=None, claim=None):
@@ -44,21 +47,34 @@ def dispatch_next(service: DecisionService, request_id: str, actor: str = 'trust
     Replay returns history with claim=None: it must never run an old attempt.
     """
     request = {'actor': service._actor(actor), 'dispatch_version': 1}
+    bootstrap_audit = None
     with service.store.transaction():
         replay = service._replay('decision_dispatches', 'dispatch_id', request_id, request)
         if replay is not None:
             return {'receipt': replay, 'claim': None, 'replayed': True}
         # Complete execution capture bounds scans; fail without truncating observations.
         service.plans.context_bytes()
-        audit = ready_audit(service)
+        audit = ready_audit(service, bootstrap_audit)
         if service.db.execute("SELECT 1 FROM runs WHERE status='running'").fetchone():
             return _receipt(service, request_id, request, 'review_required', 'unfinished_attempt', audit)
         if not audit['ready']:
             reason = 'prerequisites_blocked' if audit['pending'] else 'empty_queue'
             return _receipt(service, request_id, request, 'no_ready_task', reason, audit)
         head = service.head()
-        if head is None:
-            return _receipt(service, request_id, request, 'needs_decision', 'missing', audit)
+    if head is None:
+        from arf.bootstrap import bootstrap_initial
+        initial = bootstrap_initial(service, derived_id(request_id, 'initial-decision'),
+                                    derived_id(request_id, 'initial-publication'), actor)
+        bootstrap_audit = initial['audit']
+        if initial['reason'] is not None:
+            with service.store.transaction():
+                replay = service._replay('decision_dispatches', 'dispatch_id', request_id, request)
+                if replay is not None:
+                    return {'receipt': replay, 'claim': None, 'replayed': True}
+                return _receipt(service, request_id, request, 'needs_decision', initial['reason'],
+                                ready_audit(service, bootstrap_audit))
+        head = initial['publication_id']
+    with service.store.transaction():
         publication = service.show_publication(head)
         decision = service.show_decision(publication['decision_id'])
         service.validate_decision(decision)
@@ -98,7 +114,7 @@ def dispatch_next(service: DecisionService, request_id: str, actor: str = 'trust
                 or service.heads() != heads):
             with service.store.transaction():
                 return _receipt(service, request_id, request, 'needs_decision', 'state_changed',
-                                ready_audit(service), publication, assessment)
+                                ready_audit(service, bootstrap_audit), publication, assessment)
         row = service.db.execute('SELECT request FROM research_decisions WHERE decision_id=?',
                                  (decision['decision_id'],)).fetchone()
         saved = json.loads(row[0])
@@ -112,7 +128,7 @@ def dispatch_next(service: DecisionService, request_id: str, actor: str = 'trust
                 raise
             with service.store.transaction():
                 return _receipt(service, request_id, request, 'needs_decision', 'state_changed',
-                                ready_audit(service), assessment=assessment)
+                                ready_audit(service, bootstrap_audit), assessment=assessment)
         current = updated
         head = publication['publication_id']
     with service.store.transaction():
@@ -120,7 +136,7 @@ def dispatch_next(service: DecisionService, request_id: str, actor: str = 'trust
         replay = service._replay('decision_dispatches', 'dispatch_id', request_id, request)
         if replay is not None:
             return {'receipt': replay, 'claim': None, 'replayed': True}
-        audit = ready_audit(service)
+        audit = ready_audit(service, bootstrap_audit)
         if service.db.execute("SELECT 1 FROM runs WHERE status='running'").fetchone():
             return _receipt(service, request_id, request, 'review_required', 'unfinished_attempt', audit, publication, assessment)
         if service.head() != head or service.heads() != heads or not service._matches(current):

@@ -1,6 +1,7 @@
 # VS-004 follow-up — automatic first recommendation on v4 `run-next`
 
-**Status: BEHAVIOR APPROVED (ADR-030); CODE NOT YET CHANGED.**
+**Status: IMPLEMENTED AND VERIFIED OFFLINE (2026-11-10).**
+**Verification:** 561 full-suite tests passed; all four offline demos, first-call CLI bootstrap, restart and claim replay passed. Actual commands/results and limits are recorded in [`docs/current-state.md`](../docs/current-state.md).
 **Scope:** One bounded, local/offline follow-up to the verified VS-004 implementation. Read the existing `tasks/VS-004.md`, `docs/interfaces-vs004.md`, `docs/decisions.md`, `docs/current-state.md` and `AGENTS.md` before implementation.
 
 ## Problem

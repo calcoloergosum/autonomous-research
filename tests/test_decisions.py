@@ -225,7 +225,7 @@ def test_true_empty_blocked_missing_capacity_and_abstain(v4):
     assert run_next(v4.store)['reason'] == 'empty_queue'
     v4.store.add_task(TaskSpec.parse(spec('A')))
     missing = run_next(v4.store)
-    assert missing['status'] == 'needs_decision' and missing['reason'] == 'missing'
+    assert missing['status'] == 'needs_decision' and missing['reason'] == 'missing_candidates'
     with v4.store.transaction():
         claim = v4.store._claim_task_in_transaction('A')
     assert run_next(v4.store)['reason'] == 'unfinished_attempt'

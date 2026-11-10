@@ -1,3 +1,150 @@
+# Current state — ADR-030 initial-ranking follow-up verified offline
+
+**As of 2026-11-10:** The approved
+[`VS-004-followup-initial-ranking`](../tasks/VS-004-followup-initial-ranking.md)
+and `prompts/codex-vs004-initial-bootstrap.md` are implemented. The actual final
+full suite passed **561 tests in 25.21s**: the prior 535 cases (one expected
+no-candidate reason updated) plus 26 bootstrap cases. All four documented offline
+demos passed again. A new seven-process CLI check demonstrates first-ranking
+bootstrap, restart inspection and claim replay. These results supersede the
+historical follow-up-pending statement and 535-test report preserved below.
+
+## Implemented follow-up and temporary profile
+
+- `arf/bootstrap.py` adds a bounded bootstrap-if-no-publication helper. V4
+  run-next first checks actual admitted ready work and unfinished capacity,
+  then automatically captures, evaluates and publishes a first recommendation
+  only from registered candidate versions. The existing ranked relevance,
+  transaction-owned claim and fixed-worker lifecycle remain the execution path.
+- The trusted installed local profile is
+  `offline-synthetic-initial-ranking`, version 1, with exactly information policy
+  v1/weight 1 and synthetic_tokens ceiling 10. Selection/Feedback use the existing
+  defaults. Its complete configuration, configuration SHA-256 and implementation
+  source SHA-256 are recorded in immutable decision request/result metadata and
+  first-dispatch audit. `docs/interfaces-vs004.md` was updated before coding.
+- This is a disclosed, reversible **offline synthetic configuration**, not a
+  scientific-impact algorithm or future live-manager default. Unsupported or
+  missing configuration returns needs_decision/policy_unconfigured. No new CLI
+  option, task admission, model, worker, dependency, schema migration or external
+  dependency was added. Qualitative-only/truncated inputs preserve abstention.
+- The default Feedback has no relevance rules. Candidate text, worker success
+  and absent graph links never manufacture engineering_only rules. Thus a first
+  task may run, but subsequent unclassified evidence correctly causes
+  needs_decision/critical_invalidity. Multi-claim reuse is tested only with
+  separately configured trusted task/spec-pinned fixture rules.
+- Missing candidates now return needs_decision/missing_candidates, with versioned
+  bootstrap audit and no task/candidate creation. No ready work retains the
+  existing no-ready reasons; active capacity still requires review. Invalid
+  persisted bindings continue to fail under the existing trusted validation.
+- Initial publication uses expected_prior=None and checks the captured joint
+  snapshot and candidate-head manifest. Policy inference is outside transactions.
+  Concurrent writers/initializers yield one initial head/claim or state_changed;
+  immutable losing advisory decisions may remain. Failed/interrupted publication
+  never starts a worker. An interruption after publication leaves inspectable
+  priority for a future **explicit** invocation, never an automatic resume.
+- Ordinary decisions omit the optional controller_profile metadata key and keep
+  their exact request/replay encoding. Existing publications skip bootstrap and
+  use selective reuse/replan. Committed dispatch receipts replay before profile
+  checks with no execution. The pinned installed source profile now includes
+  bootstrap.py; existing source-drift refusal still requires a fresh context and
+  recommendation after code upgrades, rather than rewriting older decisions.
+- **P2 remains unresolved:** an uncovered admitted ready task still blocks other
+  ranked ready work under the existing strict coverage rule. A dedicated first-
+  bootstrap test verifies this boundary. V1–v3 FIFO/JSON/errors and all existing
+  approval/import, graph ownership, charter, locking, recovery and retry rules
+  remain intact. The original decision scenario intentionally retains its saved
+  static/information policy comparison; the new CLI case starts with zero
+  decisions/publications.
+
+The pre-existing untracked `START_HERE_KO.md`, `WORKFLOW.md` and
+`docs/roadmap.md`, recorded study fixtures and prior local databases were
+preserved. No network/model call, spending or substantive research was performed.
+
+## Verification actually executed for this follow-up
+
+Used the existing offline `.venv` and dependencies; no installation occurred.
+Commands were executed from the repository root with the environment activated.
+
+| Command/check | Actual result |
+| --- | --- |
+| First `python -m pytest -q tests/test_decisions.py` after implementation | 84 passed, 1 failed in 6.33s: old missing reason asserted instead of newly specified missing_candidates; updated only that assertion |
+| `python -m pytest -q tests/test_initial_bootstrap.py tests/test_decisions.py` | 110 passed in 7.97s, before adding the final blocked-priority case |
+| Final `python -m pytest -q` | **561 passed in 25.21s** |
+| `python .local/verify_vs004_offline.py` | All four offline demos/restarts passed: 37 processes, one expected unauthorized import exit 1, all other exits 0 |
+| `PYTHONPATH=. python .local/verify_initial_bootstrap.py` | Seven CLI/restart/replay processes, all exit 0 |
+| `git diff --check` | Exit 0, no whitespace errors |
+
+The 26 new tests cover initial public CLI B-before-A with no prior decision or
+publication, exact profile provenance and legacy decision encoding, conservative
+unknown-evidence refusal, explicitly configured rule-based reuse, missing and
+unsupported profiles, empty candidates and receipt replay after state changes,
+unbound/qualitative/truncated candidates, strict P2 coverage, dependency blocking,
+readiness/capacity gating, imported-task provenance, graph/task/candidate capture
+races, concurrent initializers, interruption before/after publication, SQLite
+publication failure and receipt rollback with explicit retry. Existing network-
+denying fixtures and all 535 prior regression cases remain active.
+
+## Preserved actual demos and first-call evidence
+
+Old-demo transcripts and databases:
+`.local/vs004-verified.9byoqqff/` (`commands.json`, `summary.json`, and each graph/
+decision `result.json` plus `restarted.json`). The documented commands are the
+README's init/task/run/plan workflow and:
+
+```bash
+python -m arf.graph_demo --db .local/vs004-verified.9byoqqff/vs003/arf.db
+python -m arf.graph_demo --inspect --db .local/vs004-verified.9byoqqff/vs003/arf.db
+python -m arf.decision_demo --db .local/vs004-verified.9byoqqff/vs004/arf.db
+python -m arf.decision_demo --inspect --db .local/vs004-verified.9byoqqff/vs004/arf.db
+```
+
+Build paths must be fresh; use the README mktemp examples for another run.
+VS-001 and original/imported VS-002 tasks reported mean 5/count 4, exact terminal
+no_ready_task and unchanged approval/import replay. VS-003 retained two
+unvalidated observations across restart. VS-004 retained B/A/C under one saved
+recommendation, then D after relevant feedback/replan; final truncated context
+returned deferred. Its measured worker wall seconds were 0.022923840209841728,
+0.020657677203416824, 0.019971119239926338 and 0.02144610323011875. The adverse
+synthetic case remains static 8 points versus information 1, never scientific
+reward. Foreign-key check returned no violations.
+
+The new default-profile run is preserved under
+`.local/vs004-initial-verified.08m2qwpw/`, including the exact seven argv/results
+in `commands.json`, `restarted.json`, task specs and `summary.json`. The local
+verification driver is an ignored artifact, not a new public command. It:
+
+1. Imported the unchanged demo charter and admitted A before B with the existing
+   task CLI, explicitly migrated v1→v2→v3→v4, then registered synthetic A=8/8 and
+   B=1/1+12 information bonus through the existing candidate API. Verified zero
+   decisions/publications before the first run-next.
+2. Invoked the actual public run-next in a new process. It automatically created
+   decision `aa476b22-82dd-4677-9179-a3232fedcdf6:initial-decision`, published it,
+   recorded a separate applicability assessment and ran only B. Result was
+   mean=5/count=4; actual wall_seconds=0.020647261291742325, CPU null, unused
+   LLM/GPU/human resources zero. Exactly one observation remains unvalidated.
+3. Inspected the database in a separate process and retained the exact decision,
+   including default-profile configuration SHA-256
+   `e4d49be609aaddf89769e3e173fa5b8ddd7722557da7d674bb501fce76ecf751` and empty rules.
+4. Invoked a second run-next: needs_decision/critical_invalidity, because B's new
+   evidence has no separately trusted relevance rule. A remained pending; no
+   second worker ran and no additional initial ranking was fabricated.
+5. Replayed the original claim in another process. The original receipt/run ID
+   returned with claim=None and no execution. Charter hash remained
+   `d33806961b80d24f57c72792f9511f29432eb25533990db1aa1cd1ea77dd95e9`;
+   foreign-key check had no violations.
+
+Limits remain the existing bounded synthetic scope, local asserted identities,
+source-profile pinning, explicit retry/recovery, single-host execution and
+unknown/null observed costs. No scientific validity, general relevance predictor,
+production scheduler, new authorization, unrestricted code execution or P2 policy
+change is claimed.
+
+## Historical pre-follow-up implementation and authorization
+
+The historical entries below remain unchanged and describe their original
+code/documentation state; their pending statements do not override this verified
+follow-up report.
+
 # Current state — VS-004 implemented and verified offline
 
 **Approved post-VS-004 follow-up (2026-11-10; NOT IMPLEMENTED):** ADR-030 requests that the first explicit v4 `run-next` **automatically create/publish an initial Research Manager recommendation** when actual ready work and already registered advisory candidates exist, instead of unconditionally returning `needs_decision / missing`. The approved behavioral boundary and conservative offline test contract are in `tasks/VS-004-followup-initial-ranking.md`. No first-run bootstrap code or new verification has been added by this documentation update. Existing 535-test results below describe the **pre-follow-up** implementation; an empty candidate registry remains non-executing, and no default scientific-impact calculation is authorized. The separate question of whether unranked ready work must block other ranked work (P2) is not resolved.

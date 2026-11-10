@@ -21,7 +21,7 @@ from arf.store import Store, utc_now
 
 def profile() -> dict:
     files = ('worker.py', 'executor.py', 'models.py', 'service.py', 'store.py',
-             'decisions.py', 'decision_models.py', 'dispatch.py', 'replanning.py')
+             'decisions.py', 'decision_models.py', 'dispatch.py', 'replanning.py', 'bootstrap.py')
     return {'name': 'fixed-demo-single-host', 'version': 1, 'worker': 'demo_mean',
             'active_runs': 1, 'timeout_seconds': 5,
             'source_sha256': sha(b''.join((Path(__file__).parent / f).read_bytes() for f in files))}
@@ -275,9 +275,12 @@ class DecisionService:
 
     def decide(self, request_id: str, context_id: str, candidates: list[list],
                policy: Policy = Policy(), constraints: Constraints = Constraints(),
-               actor: str = 'offline-manager', previous_decision_id: str | None = None) -> dict:
+               actor: str = 'offline-manager', previous_decision_id: str | None = None,
+               *, controller_profile: dict | None = None) -> dict:
         request = {'context_id': context_id, 'candidates': candidates, 'policy': asdict(policy),
                    'constraints': asdict(constraints), 'actor': self._actor(actor), 'previous': previous_decision_id}
+        if controller_profile is not None:
+            request['controller_profile'] = controller_profile
         bounded(request)
         replay = self._replay('research_decisions', 'decision_id', request_id, request)
         if replay is not None:
@@ -295,6 +298,8 @@ class DecisionService:
         result = {'decision_id': request_id, 'context_id': context_id, 'previous': previous_decision_id,
                   'candidate_heads': manifest, **rank(context, records, policy, constraints)}
         elapsed = time.monotonic() - start
+        if controller_profile is not None:
+            result['controller_profile'] = controller_profile
         result['calculation_cost'] = {'wall_seconds': elapsed, 'cpu_seconds': None, 'source': 'measured_controller_wall'}
         raw = bounded(result, 262144)
         with self.store.transaction():
@@ -325,6 +330,7 @@ class DecisionService:
         if (row['request_sha256'] != sha(row['request']) or request['policy'] != policy_input
                 or request['constraints'] != decision['constraints']
                 or request['context_id'] != decision['context_id']
+                or request.get('controller_profile') != decision.get('controller_profile')
                 or sorted(request['candidates']) != sorted(pairs)):
             raise PlanError('invalid', 'decision request/configuration binding mismatch')
         saved_members = list(self.db.execute('SELECT * FROM decision_members WHERE decision_id=? ORDER BY ordinal',
