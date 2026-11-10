@@ -1,6 +1,8 @@
 # VS-004 technical review — Decision loop and ranked dispatch
 
-**Status: Review recommendations only; not approved for implementation.**
+**Status: Historical technical review; bounded VS-004 implementation now approved separately in `tasks/VS-004.md` (ADR-024–029).**
+**Superseding decision:** The owner approved v4 `run-next` as the recommendation-guided entry point, preserving v1–v3 FIFO; reusable multi-claim recommendation with cost-aware relevance checks; scientific-impact judgment without mandatory numeric score. Earlier options in this review (a distinct v4-only public dispatch entry point, one-claim lifetime, universal hash-based expiry) are **not** the implementation contract. Codex must use the approved task rather than those earlier recommendations.
+
 
 **Updated after owner review (2026-11-10):** ADR-026 establishes that scientific impact is a fallible, contextual assessment, not an objectively computable number. ADR-027 prefers reusing one recommendation for multiple claims with selective, cost-aware replanning. Earlier one-claim and global-staleness choices are **historical alternatives**, not requirements. All precise interfaces and VS-004 implementation still need review.
 Prepared 2026-11-10 against `main` commit
