@@ -1,6 +1,8 @@
-# Current state — VS-002 implemented and verified
+# Current state — VS-002 implemented; VS-003 approved for offline implementation
 
-**As of 2026-11-10:** VS-002 implements the human-approved B/B/A/A choices
+**As of 2026-11-10:** VS-003's narrowed Research Graph design (D1–D8) is now **approved for implementation** and recorded as ADR-016–023 in `docs/decisions.md`. The normative scope is `tasks/VS-003.md` (G1–G10), while `tasks/VS-003-proposal.md` preserves non-binding alternatives and extended test ideas. **No VS-003 code, schema v3 migration, tests or research graph has yet been implemented.** VS-005 monitoring/UI and live research remain deferred.
+
+VS-002 implements the human-approved B/B/A/A choices
 (ADR-012–015) within `tasks/VS-002.md`. VS-001 remains operational on schema
 v1 and migrated v2 databases. This is an offline plumbing demonstration, with
 no substantive research, live model calls, automatic authorization, external
@@ -281,4 +283,4 @@ The filesystem owner and installed Python/package code are trusted. SQL guards d
 
 The timeout and small output rely on the fixed audited worker. Capturing output is not a general memory sandbox for arbitrary programs. Import size, process memory and total database growth have no configurable quotas in this slice. A forced kill of the controller releases its advisory lock and can leave a child briefly running; that child cannot finalize the DB. Recovery treats its outcome and duration as unknown. The child is side-effect-free, and retry remains explicit; exactly-once execution, orphan-process supervision, distributed leases and full power-loss/storage-corruption recovery are not promised. Lock files must not be removed during operation. The crash test simulates interruption after the durable claim rather than asserting arbitrary machine power-loss behavior.
 
-Deferred human decisions remain unchanged: actual study question/evidence criteria, real budgets and permissions, impact/cost prediction, allocation policy, baseline revision, human working hours, LLM APIs, GPU scheduling and generated-code isolation. No later vertical slice is implemented here. VS-002's B/B/A/A architectural choices have since been approved; implementation is authorized only within `tasks/VS-002.md` and is still pending.
+Deferred human decisions remain unchanged: actual study question/evidence criteria, real budgets and permissions, impact/cost prediction, allocation policy, baseline revision, human working hours, LLM APIs, GPU scheduling and generated-code isolation. The historical VS-002 material above documents the earlier implementation process. As of the current header, VS-002 has been implemented and reviewed; VS-003 is approved for offline implementation but remains unimplemented. There is no live autonomous research deployment.
