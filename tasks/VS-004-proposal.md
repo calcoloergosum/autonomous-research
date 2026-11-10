@@ -345,7 +345,9 @@ Tests must verify **behavior**, not merely the number of cases. A synthetic poli
 
 VS-005 remains a separate design exercise for **monitoring and visualization**. VS-004 should expose durable read-only decision/prediction/re-evaluation records that a later monitor can consume, but must not predefine dashboards, progress percentages, visual layouts or user interaction patterns.
 
-## 15. Human review decisions (unapproved)
+**Current authority (2026-11-10):** The bounded implementation task in [`VS-004.md`](VS-004.md) is now **approved** (ADR-024–029). V4-11 is settled: the existing `run-next` retains FIFO on v1–v3 and becomes recommendation-ranked on v4. Scientific impact is a fallible, sometimes qualitative judgment; recommendations can be reused for multiple claims under selective replanning. The alternatives below remain historical options, not competing authorization. Do not treat this proposal as permission to broaden the approved task.
+
+## 15. Historical design alternatives and approved VS-004 boundary
 
 The following are **choices for discussion**, not accepted ADRs or instructions to implement any alternative:
 
