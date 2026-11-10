@@ -1,59 +1,55 @@
 # VS-005 proposal — Research Observatory (local, read-only, live)
 
-**Status: PROPOSED FOR HUMAN REVIEW; NOT APPROVED FOR IMPLEMENTATION.**
+**Status: REVISED PROPOSAL FOR HUMAN REVIEW; NOT APPROVED FOR IMPLEMENTATION.**
 Prepared 2026-11-10 against `main` commit `48d2412f26497f500e9de75514add8a78da9c6f3` following the verified VS-004 / ADR-030 offline first-ranking follow-up.
-**Prior decisions made in conversation:** VS-005 starts **observation-only**, uses a **local browser UI**, supports **automatic refresh**, and should be **simple but powerful**. These are product-direction constraints, not approval of specific HTTP APIs, packages, schema changes, network exposure or implementation.
+**Human-selected product direction:** VS-005 is **observation-only**, uses a **local browser UI**, and **automatically refreshes**. Latest refinement: prioritize **one complete question-to-evidence user journey** rather than deliver a large multi-dashboard system or predefine nine public APIs. All implementation details and new public interfaces remain unapproved.
 **Related contracts:** [VS-003 graph](../docs/interfaces-vs003.md), [VS-004 decision ledger](../docs/interfaces-vs004.md), [current implementation](../docs/current-state.md), [architecture decisions](../docs/decisions.md).
 **Authority:** Design only. Do not add application code, DB tables, migrations, approved ADRs, workers, network/model access, executable actions, scientific validation or VS-005 tests under this proposal.
 
-## 1. Product question and success criterion
+## 1. Product objective: understand one decision end-to-end
 
-> Can a researcher inspect what the Autonomous Research Framework is investigating, what it has actually observed, why a task was prioritized or deferred, and how those judgments changed—without having to reconstruct the story from several separate tools?
+> When an experiment has run, can a researcher understand **why that task was selected over available alternatives, what scientific claims and assumptions were recorded, which evidence was actually observed, and why a later decision changed or stayed the same**—in one uninterrupted browser journey?
 
-Treat **Research Observatory** as a *lens on existing authoritative records*, not a second research-management system.
+This is not a generic operations dashboard. The first VS-005 must demonstrate one coherent **decision audit**, backed entirely by existing ARF records. Research Map, Decision Timeline and Execution remain useful *future lenses*, but they are **not three mandatory complete screens** for the first implementation.
 
-The first slice should support an ordinary operator answering:
+The first user's path is:
 
-1. **What is happening now?** Current admitted work, blockers, recent runs, decisions, publication/reuse/replan events and resource observations.
-2. **Why this work?** Recorded motivation and graph relationships, the exact candidate and decision membership, contextual assessments, ranking exclusions and dispatch selection.
-3. **What changed and what was known then?** Open an immutable decision checkpoint and compare it with another checkpoint or today's state, distinguishing real changes from different query scopes and unavailable historical information.
-4. **What remains unknown?** Unvalidated evidence, contested or incomparable impact, missing cost estimates, truncated graph views, unmapped/unranked tasks and unsupported historical claims.
+1. Open Observatory on a supported v4 database. Read the **current admitted task state** and the **latest recorded dispatches**.
+2. Select a real task/dispatch (for example the offline fixture's Task B). The **same selection** persists through the rest of the journey.
+3. Follow the recorded chain **dispatch → recommendation membership → reasoning / assumptions / excluded alternatives → saved Decision Context**. Show actual source IDs, not synthesized natural-language causality.
+4. Inspect the chosen task's run and **unvalidated Evidence**, with actual observed cost separated from synthetic proxy and predicted cost.
+5. Open the **decision checkpoint** behind the selected dispatch; compare with a later decision, displaying what genuinely changed (candidate membership/order, feedback, interpretation, selected context scope) and what cannot safely be compared.
+6. Observe a trusted *separate process* change the underlying DB. The live shell updates **without stealing focus**; a pinned checkpoint stays pinned.
 
-**Not a criterion:** a universal research-progress percentage, an empirically true importance score, a claim of scientific causality from graph edges, or complete reconstruction of all past mutable execution states.
+**Success is this end-to-end understanding, not feature count.** Every visible explanation must be traceable to persisted IDs, a clearly attributed judgment or an explicit `not_recorded`/`unknown` label. Neither task throughput nor graph growth is a universal research-progress score.
 
-## 2. One workspace, not three disconnected dashboards
+**First-slice design constraints:** a minimal single-page interface, a stable Inspector, a short recent-execution list, a small **Why? trace**, two-checkpoint comparison, and safe auto-refresh. Search, a general interactive world graph, advanced charts, a full-screen execution board and flexible timeline browsing are extensions only after the user journey is validated.
 
-### 2.1 Research Explorer shell
+## 2. A small single-page Research Explorer
 
-A desktop-first **single workspace** with:
+### 2.1 Initial visible regions
 
-- **Main canvas:** the research object or graph neighborhood currently in focus.
-- **One persistent Inspector:** selected object, evidence/assumptions, related decisions, runs, baseline status, provenance and direct links to original records.
-- **One thin event rail / Checkpoint picker:** recent significant recorded events and selectable decision checkpoints.
-- **Three small viewpoint switches**—`Map`, `Decisions`, `Execution`—that change the center visualization **without losing selected object, checkpoint or filters**.
-- **Search / jump-to-ID** for known Q/H/C/T/R/E/B objects, decisions, candidates and tasks, limited/paginated. No free-form natural-language agent or arbitrary DB query facility.
+Start with only **three coordinated regions** rather than complete Map/Decisions/Execution pages:
 
-**Map lens:** show typed Q/H/C/O, B and T/R/E nodes connected through existing graph/derived links. Distinguish semantic/intention edges, unreviewed assessments, factual execution relations and baseline transitions by type and legend. Default to a bounded, focused neighborhood; expand on demand.
+- **Recent activity / selection rail:** current admitted tasks and latest recorded dispatches, with short `claimed`, `no_ready_task`, `needs_decision` and `deferred` distinctions. Its purpose is to answer "what happened?" and offer a selectable entry point—not to build a full scheduler dashboard.
+- **Why? / evidence trace:** a compact sequence of grounded, clickable references (Task ↔ candidate binding ↔ decision membership ↔ decision context ↔ run/Evidence as available). Show selected vs excluded candidate decisions, recorded assumptions, policy name and whether scores are `synthetic_proxy`. This is the main content, not a decorative network.
+- **Persistent Inspector + Checkpoints:** the selected record's original fields/provenance and an optional comparison with one later/earlier Decision. Show uncertainty, incomplete data, temporally qualified status and explicit unavailable links.
 
-**Decisions lens:** for the selected object, show related candidate membership, prior and current ranking, other considered/filtered/unmapped candidates, publication and Replanning Policy decision (`reuse`, `replan`, `refuse`, `defer`). Explanations open saved estimate/judgment input and assumption fields. Mark the current synthetic scoring policy explicitly as a **fixture proxy**, never scientific truth.
+Recommended layout: a modest left list, a main center trace, and a contextual Inspector on the right for desktop. On narrow screens the same data may stack, without introducing a separate navigation architecture. One explicit `Live / Pinned checkpoint` control is enough for the initial temporal UI.
 
-**Execution lens:** task readiness/current status and blockers, runs, `unvalidated` Evidence and observed resource costs, with expected cost displayed **separately**. The dependency DAG is a distinct view or filter, not an untyped edge in the scientific graph.
+### 2.2 One shared selection, not a universal navigation framework
 
-**Why path:** selecting a task/run/decision exposes a compact, source-linked chain such as `task → candidate binding → recommendation membership → impact judgment/assumptions → captured context → related graph/Evidence`. An absent link is `not recorded`, not an inferred relationship. Creation-time motivation must not be confused with retrospective explanation or causal proof.
+The minimal UI selection is a typed, bounded reference such as `{kind, id, revision?}`. A chosen Task or Dispatch stays selected during live refresh, Inspector expansion and checkpoint comparison. Preserve graph/trace expansion and scroll position where reasonable. If a related record is missing, retain the selection and explain the missing link rather than silently navigate away.
 
-### 2.2 A simple selection model
+The first prototype should **not** require a dynamic full-graph layout engine, three fully implemented lenses, broad fuzzy search, global time slider or persistent UI preference store. For a local motivated neighborhood, a small *list or fixed DAG trace with explicit link kinds* is sufficient. General Research Map/Focus Mode with expandable typed edges is a deliberate follow-up, once this trace proves useful.
 
-One shared selection: `{kind, id, revision?}`. One viewpoint: `map | decisions | execution`. One temporal mode: `live | decision_checkpoint | graph_as_of`. The inspector follows selection; switching lenses does not reset it. Stable typed IDs are used in URLs/links (with length limits, not raw SQL). Graph zoom/pan and manually expanded neighborhood survive normal live refresh.
+**User-centered hierarchy:** `What happened?` → `Why was this prioritized?` → `What did it rely on?` → `What changed?`. The user should not have to mentally join three dashboards to answer these.
 
-Proposed minimal navigation examples:
+### 2.3 Scope reserved for subsequent iterations
 
-- Click H → Map shows its local graph and relevant unreviewed assessments.
-- Select a Task T → Inspector shows dependency readiness, mapped candidate(s), ranked and excluded decisions, actual claims and runs.
-- Select a Dispatch → Inspector shows the exact saved recommendation, applicable reuse/replan assessment and claimed run—or the recorded no-execution reason.
-- Click Evidence E → inspector shows raw provenance, validation label, link interpretations and what changed in subsequent decisions; it must not assert a hypothesis is verified.
-- Click a Decision checkpoint → same object remains selected, but its then-captured context and candidate membership are used in checkpoint-aware panels.
+Once the first flow is validated, expand toward the originally proposed three lenses **Map / Decisions / Execution**, integrated with one selection/Inspector, then a richer Focus Mode, full event rail and search. Do not implement those views merely because they were shown in early sketches.
 
-A user should not need to open an unbounded world graph to understand a single experiment.
+Treat scientific/intention graph edges, factual execution edges and operator baseline transitions as **different meanings** even in the small trace. A recorded motive is not causal proof, an unreviewed assessment is not validation, and an unattested path is `not_recorded`—not guessed.
 
 ## 3. Data already available and its limits
 
