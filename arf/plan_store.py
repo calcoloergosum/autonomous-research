@@ -103,6 +103,9 @@ def _schema_objects(connection: sqlite3.Connection) -> dict:
 
 
 def verify_schema(store: Store, version: int) -> None:
+    if version in (3, 4):
+        from arf.graph_store import verify
+        return verify(store, version)
     # Compare to SQLite's own normalized representation of our known DDL.
     with sqlite3.connect(":memory:") as reference:
         for statement in SCHEMA + (PLAN_SCHEMA if version == 2 else []):
@@ -116,11 +119,11 @@ def verify_schema(store: Store, version: int) -> None:
 def migrate(store: Store) -> dict:
     with store.transaction():
         version = store.connection.execute("PRAGMA user_version").fetchone()[0]
-        if version not in (1, 2, 3):
+        if version not in (1, 2, 3, 4):
             raise PlanError("schema", "unsupported database version")
-        if version == 3:
+        if version in (3, 4):
             from arf.graph_store import verify
-            verify(store, 3)
+            verify(store, version)
             return {"schema_version": 2, "status": "already_current"}
         verify_schema(store, version)
         if version == 2:
@@ -135,7 +138,7 @@ class PlanStore:
     def __init__(self, store: Store):
         self.store = store
         self.db = store.connection
-        if self.db.execute("PRAGMA user_version").fetchone()[0] not in (2, 3):
+        if self.db.execute("PRAGMA user_version").fetchone()[0] not in (2, 3, 4):
             raise PlanError("schema", "planning requires explicit plan migrate")
         # Required objects are verified; extra developer diagnostic triggers are
         # harmless here. Migration itself checks the complete known schema.

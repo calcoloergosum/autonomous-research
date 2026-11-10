@@ -1,6 +1,6 @@
 # Autonomous Research Framework (ARF)
 
-**Status:** VS-001, offline VS-002, and the bounded VS-003 Research Graph are implemented locally. The graph records unreviewed assertions and scoped operator baseline transitions through an internal service. Planning uses a deterministic fixture mock, explicit local operator decisions, and a separate task import. Only the built-in deterministic demo worker executes; autonomous research remains future work.
+**Status:** VS-001–004 are implemented and verified offline. Explicit schema v4 adds an immutable decision ledger, qualitative impact judgments, synthetic reference policies and selectively reusable ranked dispatch through the existing `run-next`. Schemas v1–v3 retain FIFO. Only the built-in deterministic demo worker executes; autonomous substantive research remains future work.
 
 ARF is a future system for autonomously managing a potentially unbounded portfolio of research tasks to answer a *human-defined* ultimate research question. It will learn estimates of impact and evidence-acquisition cost, balance exploration and exploitation, schedule limited LLM/compute/human resources, and revise intermediate research baselines without changing the ultimate question.
 
@@ -150,6 +150,34 @@ For an existing v2 database, migration is an explicit internal
 compatibility response never downgrades the database. Graph-only changes do not
 change VS-002 export bytes/hashes or execution authorization/freshness.
 
+## Offline decision loop fixture (VS-004)
+
+The [v4 internal contract](docs/interfaces-vs004.md) specifies the explicit
+`arf.decision_store.migrate_decisions(store)` v3→v4 migration. Init remains v1;
+old plan/graph migrations verify v4 compatibility without downgrading it.
+On v4, the existing `run-next` automatically reuses or recomputes a published
+manager ranking and claims at most one admitted ready task. Missing/unusable
+ranking returns `needs_decision`; reasoned abstention returns `deferred`.
+There is no FIFO fallback or new public manager command. Saving a decision or
+publishing priority never starts work, admits tasks or changes approvals.
+
+```bash
+source .venv/bin/activate
+mkdir -p .local
+decision_demo_dir=$(mktemp -d .local/vs004.XXXXXX)
+python -m arf.decision_demo --db "$decision_demo_dir/arf.db" > "$decision_demo_dir/result.json"
+python -m arf.decision_demo --inspect --db "$decision_demo_dir/arf.db" > "$decision_demo_dir/restarted.json"
+```
+
+Observed: real fixed workers ran B, A, C under one recommendation, then newly
+introduced D under an automatically recomputed recommendation after relevant
+fictional branch/cost feedback and an operator baseline change. Each claim has
+its own relevance assessment and atomic receipt. A truncated context deferred
+while work remained ready. The fixture also records an adverse synthetic case
+where the information bonus loses to static order; these payoffs are not
+scientific impact or worker observations. All four observations are unvalidated.
+See current-state for commands, actual measured costs and verification results.
+
 ## Recovery and explicit retry
 
 An interrupted controller leaves its committed attempt `running`. After confirming the previous controller has stopped:
@@ -171,7 +199,7 @@ POSIX advisory locking serializes `run-next` and `recover` on one host; SQLite t
 
 ## Status and work ownership
 
-- This package: VS-001 execution, VS-002 offline planning/authorization/import, and VS-003 internal research graph are implemented. See current-state for observed verification results.
+- This package: VS-001 execution, VS-002 offline planning/authorization/import, VS-003 internal research graph and VS-004 offline decision/ranked dispatch are implemented. See current-state for observed verification results.
 - VS-002 implements the approved [task](tasks/VS-002.md) and ADR-012–015. No real research study, live LLM integration, automatic approval, or advanced scheduler is implemented or authorized.
 - Human + ChatGPT: review deviations, decide on public/data interface changes and future milestones.
 

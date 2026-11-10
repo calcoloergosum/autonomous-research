@@ -45,7 +45,7 @@ python -m arf recover       --> interrupted/unknown state review --> SQLite
 - `service`: create/list tasks, dependency eligibility, claim/execute/finalize, recover.
 - `cli`: small interface exposing the above; machine-readable JSON preferred for inspection.
 
-No AI policy decides task selection yet: `run-next` uses stable FIFO among ready tasks. This is an intentional baseline, not an endorsement of FIFO for real research.
+On schemas v1–v3, `run-next` uses stable FIFO among ready tasks. This is an intentional baseline, not an endorsement of FIFO for real research.
 
 ## Data ownership, trust and provenance
 
@@ -66,3 +66,18 @@ No AI policy decides task selection yet: `run-next` uses stable FIFO among ready
 ## Extension seams after VS-001
 
 `ResearchManager`, `AllocationPolicy`, `ImpactCostPredictor`, `ResourceScheduler`, `Worker`, `HumanQueue`, `BaselineManager` are architectural seams, not mandatory full classes in VS-001. Do not implement speculative abstractions without a concrete use in the first milestone.
+
+## Approved VS-004 offline path
+
+Explicit v4 migration adds immutable contexts, candidate versions, scientific
+judgments/cost estimates, decisions, automatic priority publications, selective
+replanning assessments and per-claim receipts. Decision policies are pure
+synthetic fixtures; trusted persistence and ranked dispatch remain separate.
+The same run-next selects an admitted ready task by recommendation on v4 and
+shares the original fixed-worker execution/finalization/recover lifecycle.
+Each claim independently checks all authoritative ready work, admission,
+dependencies, installed profile and a current relevance assessment. Recommendations
+can guide several claims; unknown critical evidence refuses, and known relevant
+feedback requests one bounded recomputation. No FIFO fallback, task admission,
+worker expansion, charter mutation or unattended execution is added. See
+[the internal v4 contract](interfaces-vs004.md) and actual current-state results.

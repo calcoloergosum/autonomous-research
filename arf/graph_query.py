@@ -266,30 +266,41 @@ def read_graph(g, *, at_seq=None, node=None, roles=(), edge_types=(), history=Fa
     if type(history) is not bool or any(r not in ROLES for r in roles) or any(t not in SEMANTIC + FACTS for t in edge_types):
         raise GraphError('invalid', 'unknown typed query filter')
     with snapshot(g):
-        seq = sequence(g, at_seq)
-        budget = Budget(seq, limits)
-        if node:
-            g._ref(node, allow_head=True)
-            if roles and node.role not in roles:
-                refs = ()
-            elif history and node.role in ('Q', 'H', 'C') and node.revision is None:
-                rows = g.db.execute('''SELECT revision_id FROM graph_idea_revisions
-                    WHERE idea_id=? AND seq<=? ORDER BY seq LIMIT ?''',
-                                    (node.id, seq, limits.nodes + 1))
-                refs = (Ref(node.role, node.id, r['revision_id']) for r in rows)
-            else:
-                refs = (node,)
+        return _read_graph_in_transaction(g, at_seq=at_seq, node=node, roles=roles,
+            edge_types=edge_types, history=history, edge_id=edge_id, limits=limits)
+
+
+def _read_graph_in_transaction(g, *, at_seq=None, node=None, roles=(), edge_types=(), history=False, edge_id=None, limits=QueryLimits()):
+    """Private joint-snapshot seam; public wrappers still refuse nesting."""
+    if not g.db.in_transaction:
+        raise GraphError('invalid', 'caller-owned read transaction required')
+    limits.validate()
+    if any(r not in ROLES for r in roles) or any(t not in SEMANTIC + FACTS for t in edge_types):
+        raise GraphError('invalid', 'unknown typed query filter')
+    seq = sequence(g, at_seq)
+    budget = Budget(seq, limits)
+    if node:
+        g._ref(node, allow_head=True)
+        if roles and node.role not in roles:
+            refs = ()
+        elif history and node.role in ('Q', 'H', 'C') and node.revision is None:
+            rows = g.db.execute('''SELECT revision_id FROM graph_idea_revisions
+                WHERE idea_id=? AND seq<=? ORDER BY seq LIMIT ?''',
+                                (node.id, seq, limits.nodes + 1))
+            refs = (Ref(node.role, node.id, r['revision_id']) for r in rows)
         else:
-            refs = () if edge_id else node_refs(g, seq, roles, history, limits.nodes)
-        for ref in refs:
-            value = node_view(g, ref, seq)
-            if value and not budget.add('nodes', value):
-                break
-        for edge in edges(g, seq, edge_types, history, limits.edges, node, edge_id):
-            if not budget.add('edges', edge):
-                break
-        baselines(g, seq, budget)
-        return budget.result
+            refs = (node,)
+    else:
+        refs = () if edge_id else node_refs(g, seq, roles, history, limits.nodes)
+    for ref in refs:
+        value = node_view(g, ref, seq)
+        if value and not budget.add('nodes', value):
+            break
+    for edge in edges(g, seq, edge_types, history, limits.edges, node, edge_id):
+        if not budget.add('edges', edge):
+            break
+    baselines(g, seq, budget)
+    return budget.result
 
 
 def traverse(g, root, direction, at_seq, limits):

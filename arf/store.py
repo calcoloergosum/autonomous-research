@@ -141,7 +141,7 @@ class Store:
                     for statement in SCHEMA:
                         self.connection.execute(statement)
                     self.connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
-                elif version not in (1, 2, 3):
+                elif version not in (1, 2, 3, 4):
                     raise ARFError(f"unsupported database schema version: {version}")
         except BaseException:
             self.connection.close()
@@ -267,6 +267,8 @@ class Store:
         """Commit the running attempt before returning; execution is never in this transaction."""
         with self.transaction():
             self.study()
+            if self.connection.execute("PRAGMA user_version").fetchone()[0] == 4:
+                raise ARFError("ranked_dispatch_required: use run-next on v4")
             if self.connection.execute("SELECT 1 FROM runs WHERE status='running'").fetchone():
                 raise ARFError("unfinished running attempt; inspect and use recover before run-next")
             row = self.connection.execute(
@@ -278,16 +280,25 @@ class Store:
             ).fetchone()
             if row is None:
                 return None
-            run_id = str(uuid.uuid4())
-            self.connection.execute(
-                "UPDATE tasks SET status='running' WHERE study_id=? AND task_id=?",
-                (row["study_id"], row["task_id"]),
-            )
-            self.connection.execute(
-                "INSERT INTO runs(run_id,study_id,task_id,started_at,status) VALUES (?,?,?,?,'running')",
-                (run_id, row["study_id"], row["task_id"], utc_now()),
-            )
-            task_id = row["task_id"]
+            claim = self._claim_task_in_transaction(row["task_id"])
+        return claim
+
+    def _claim_task_in_transaction(self, task_id: str) -> dict:
+        """Trusted caller owns selection, capacity check and write transaction."""
+        if not self.connection.in_transaction:
+            raise ARFError("claim requires a transaction")
+        task = self.task(task_id)
+        if task["status"] != "pending" or task["blockers"] or task["kind"] != "demo_mean":
+            raise ARFError("task is not eligible for claim")
+        run_id = str(uuid.uuid4())
+        self.connection.execute(
+            "UPDATE tasks SET status='running' WHERE study_id=? AND task_id=?",
+            (task["study_id"], task_id),
+        )
+        self.connection.execute(
+            "INSERT INTO runs(run_id,study_id,task_id,started_at,status) VALUES (?,?,?,?,'running')",
+            (run_id, task["study_id"], task_id, utc_now()),
+        )
         return {"run_id": run_id, "task": self.task(task_id)}
 
     def finish_run(self, run_id: str, *, result: dict | None, error: str | None,

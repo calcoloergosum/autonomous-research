@@ -48,7 +48,7 @@ class GraphService:
         self.store = store
         self.db = store.connection
         self.study_id = store.study()['study_id']
-        if self.db.execute('PRAGMA user_version').fetchone()[0] != 3:
+        if self.db.execute('PRAGMA user_version').fetchone()[0] not in (3, 4):
             raise GraphError('schema', 'graph requires explicit v2 to v3 migration')
         # Like PlanStore, allow additional diagnostic triggers during operation.
         import sqlite3

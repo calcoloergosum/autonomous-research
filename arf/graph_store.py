@@ -121,6 +121,9 @@ for _table in ("graph_operations", "graph_ideas", "graph_idea_revisions", "graph
 
 
 def verify(store: Store, version: int) -> None:
+    if version == 4:
+        from arf.decision_store import verify as verify_decisions
+        return verify_decisions(store)
     with sqlite3.connect(":memory:") as reference:
         for statement in SCHEMA + PLAN_SCHEMA + (GRAPH_SCHEMA if version == 3 else []):
             reference.execute(statement)
@@ -134,10 +137,10 @@ def verify(store: Store, version: int) -> None:
 def migrate(store: Store) -> dict:
     with store.transaction():
         version = store.connection.execute("PRAGMA user_version").fetchone()[0]
-        if version not in (2, 3):
+        if version not in (2, 3, 4):
             raise GraphError("schema", "graph migration requires explicit v1 to v2 migration first")
         verify(store, version)
-        if version == 3:
+        if version in (3, 4):
             return {"schema_version": 3, "status": "already_current"}
         for statement in GRAPH_SCHEMA:
             store.connection.execute(statement)

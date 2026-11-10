@@ -1,3 +1,187 @@
+# Current state — VS-004 implemented and verified offline
+
+**As of 2026-11-10:** The approved VS-004 task and ADR-024–029 are implemented.
+The final full suite passed **535 tests in 23.85s**, including all 450 original
+regressions and 85 v4 cases. All four offline demonstrations passed in 37
+separate CLI processes, including independent VS-003/v4 restart inspection.
+Only the existing fixed demo worker executed. No study charter, approval/import
+boundary, worker capability, external dependency or substantive research scope
+was changed. No network request, external model call, spending, unattended loop
+or VS-005 feature was introduced. The pre-existing untracked `START_HERE_KO.md`,
+`WORKFLOW.md`, and `docs/roadmap.md` remain untouched.
+
+## Implemented behavior and compatibility
+
+- `docs/interfaces-vs004.md` was authored before application code and specifies
+  the additive internal API, schema, canonicalization, limits, applicability
+  policy, rollback/replay and exact v4 run-next outcomes. The task status is now
+  implemented; earlier proposal/review alternatives remain historical.
+- `decision_store.py` provides explicit verified transactional v3→v4 migration
+  with eight immutable ledger tables, same-study/composite foreign keys, unique
+  request IDs, candidate membership, publication predecessor and per-run receipts.
+  No legacy row or SQLite task sequence is backfilled or relabeled. Populated
+  migration, schema refusal, rollback, restart and repeated migration are tested.
+- `decisions.py` joins the private transaction-owned graph read body with the
+  unchanged complete VS-002 execution snapshot in one read transaction. Contexts
+  retain exact pins, partiality/frontier, charter/execution hashes, installed
+  source profile and revealed synthetic feedback. Public graph read wrappers
+  retain their nesting refusal. A concurrent WAL writer test verifies both
+  components reflect the same snapshot.
+- Candidate versions derive identity from study and stable source origin. Batch
+  receipts bind all inputs and actor even when every version already exists.
+  Separate trusted bindings validate stored normalized TaskSpec and manual or
+  exact approved-import provenance. Old import approval freshness is unchanged;
+  a successfully imported task remains admitted after its old context stales.
+- Pure static/information fixture policies preserve qualitative, unknown,
+  incomparable and contested scientific judgments separately from synthetic
+  proxies and dimensioned cost predictions. Unknown costs remain null. Worker
+  wall estimates use the saved median/range; CPU and scientific impact are never
+  inferred from success. Money ceilings require an explicit matching currency.
+- `replanning.py` records bounded, attributed reuse/replan/refuse/defer decisions,
+  consulted evidence/runs, graph/head changes, uncertainty and measured check
+  costs. Exact synthetic task/spec rules are the only basis for declaring new
+  evidence noncritical, regardless of graph links. Unknown evidence or uncertain
+  attempts refuse. Known branch/cost feedback, graph/baseline changes, candidate
+  arrival and observed wall cost consulted by a ceiling request recomputation.
+- V4 `run-next` independently enumerates all admitted dependency-ready work,
+  validates a published ranking and per-claim relevance assessment, and claims
+  at most one task. It never falls back to FIFO. Genuine no-ready, missing or
+  unusable ranking, deliberate abstention and unfinished capacity have distinct
+  durable outcomes. Direct v4 `Store.claim_next` refuses. Initial missing ranking
+  returns needs_decision; manager configuration/publication is internal.
+- Ranked claim and immutable receipt commit atomically through the extracted
+  original claim body. The same fixed-worker execution, result validation,
+  finalization, controller lock, recovery and explicit retry path serve all
+  schemas. Receipt failure rolls back task/run; finalization failure preserves
+  the committed running attempt. Committed claims never execute on receipt
+  replay, including after success, failure, recovery or replacement publication.
+- V1–v3 retain FIFO and exact prior CLI responses/errors. Init still creates v1.
+  Plan/graph services accept v4; their migrations verify it and return their
+  historical compatibility versions 2/3 without downgrade. Decision/graph-only
+  writes do not affect legacy export-v1 bytes/hash or approval freshness.
+
+## Reversible v1 assumptions and remaining limits
+
+The two policies and relevance rules are explicitly synthetic fixtures, not a
+scientific-value calculator or general relevance predictor. Every graph change
+conservatively requests a new assessment. Engineering-only worker changes can
+reuse an earlier recommendation when the attributed fixture rule supports it;
+wall observations trigger recomputation when a wall ceiling was consulted.
+Unknown critical evidence requires an explicit new reviewed scenario/context,
+not an invented relevance classification. No final scientific sufficiency or
+study-complete decision exists.
+
+Candidate batches/rounds and automatic head manifests cap at 64; the ledger can
+hold additional identities but automatic selection refuses an oversized manifest
+instead of silently dropping candidates. Execution/context/decision limits are
+1 MiB/2 MiB/256 KiB. Inspection pages default to 32, cap at 64 and 2 MiB, and
+return explicit continuation. These are versioned engineering defaults.
+
+The relevance policy permits at most 64 changed evidence/run items and a
+one-second inference budget checked after evaluation. This is not a preemptive
+total-controller deadline. Snapshot/evaluator wall costs are separate and summed;
+calculation duration is recorded separately; ledger-write/claim overhead and CPU
+cost are unmeasured. Policy ceilings are estimates, not reservations. Unsupported
+real hard resource constraints refuse; only the existing fixed-worker timeout,
+output checks and single-run capacity are enforced. No new budget accounting or
+unknown-code isolation is claimed.
+
+Actors remain trusted local assertions. Code/profile changes require a new
+context/recommendation; saved decisions never silently substitute a newer policy.
+An assessment surviving a rolled-back receipt replays under identical inputs;
+changed intermediate inputs require a fresh request ID. There is no background
+retry, provider callback, exactly-once physical execution, multi-host scheduling,
+scientific validation, calibrated reward model or starvation policy.
+
+## Verification actually executed
+
+Used the existing offline `.venv`: Python 3.12.3, SQLite 3.45.1, PyYAML 6.0.1,
+pytest 9.1.1. No dependency was installed. Commands were run from the repository
+root with `source .venv/bin/activate` (the unactivated shell has no `python`).
+
+| Command/check | Observed result |
+| --- | --- |
+| Baseline `python -m pytest -q` | 450 passed in 19.06s |
+| First v4 focused suite | 35 passed, 6 failed in 2.75s; tuple/JSON normalization and test fixture argument errors corrected |
+| Original regressions after lifecycle extraction | 450 passed in 18.28s |
+| First expanded full suite | 530 passed in 23.63s |
+| Final `python -m pytest -q` after final assertions | **535 passed in 23.85s** |
+| VS-001/002 documented CLI demos, VS-003/v4 harness + restart | 37 separate processes; 36 exit 0, one expected unauthorized import exits 1 |
+| `git diff --check` | Exit 0, no whitespace errors |
+
+The 85 v4 cases exercise D1–D13: ranked B-before-A via the same public command,
+multiple separately assessed claims per recommendation, both actual observed
+branch alternatives, candidate arrival/version races, exact replay/conflict,
+qualitative impact and null costs, synthetic feasibility and currency refusal,
+bounded continuation/truncation, unknown evidence and unsupported constraints,
+manual/imported admission and forged bindings, controller contention, concurrent
+publication/graph/admission changes, replan snapshot races, transactional receipt
+rollback, database finalization failure, interruption/recover/retry, populated
+migration, unchanged legacy exports, and immutable tables. Shared v4 lifecycle
+coverage includes wrong/invalid/nonfinite/oversized outputs, numerical edge
+inputs and timeout. Network calls are denied in the v4 fixture tests.
+
+## Actual offline demonstrations and preserved transcripts
+
+The local driver `python .local/verify_vs004_offline.py` executed the README's
+VS-001/002 commands, adding proposal replay, then these documented harness calls:
+
+```bash
+python -m arf.graph_demo --db .local/vs004-verified.52x8y_nq/vs003/arf.db
+python -m arf.graph_demo --inspect --db .local/vs004-verified.52x8y_nq/vs003/arf.db
+python -m arf.decision_demo --db .local/vs004-verified.52x8y_nq/vs004/arf.db
+python -m arf.decision_demo --inspect --db .local/vs004-verified.52x8y_nq/vs004/arf.db
+```
+
+Build requires a fresh path; use the README's mktemp examples to reproduce.
+Actual databases are under `.local/vs004-verified.52x8y_nq/`. `commands.json`
+records every argv, exit and diagnostic; `summary.json` retains measured legacy
+runs and checks. Each graph/decision directory contains `result.json` and
+`restarted.json`. The driver and all generated databases/transcripts are ignored
+local verification artifacts, not a new public interface.
+
+VS-001: one successful mean=5/count=4, wall_seconds=0.019575947895646095;
+no interrupted attempt, then exact no_ready_task. VS-002: original and imported
+means=5/count=4, measured wall_seconds=0.018731562420725822 and
+0.019385190680623055; unapproved import refused, approval/import replay preserved
+receipts, two unvalidated observations, then exact no_ready_task. VS-003:
+graph seq=20, two unvalidated observations, imported task still pending,
+truncation/history verified, all legacy rows/context preserved through graph
+writes and evidence identical after process restart.
+
+V4 produced four real fixed-worker attempts, all mean=5/count=4:
+
+| Task | Recommendation | Actual wall seconds |
+| --- | --- | --- |
+| B | information-manager | 0.020343385636806488 |
+| A | information-manager (reuse) | 0.02195993810892105 |
+| C | information-manager (reuse) | 0.01941184140741825 |
+| D | 7b47891e-a032-4d1c-912b-7f73ac978031:replan | 0.02033579722046852 |
+
+Each claim has a separate assessment; measured check+snapshot wall times were
+0.001215767115354538, 0.002920927479863167, 0.0032578930258750916 and
+0.003828682005405426 seconds. Initial ranking calculation took
+0.00018263235688209534 seconds; recomputation took 0.0001936350017786026.
+These are local engineering measurements, not performance guarantees.
+
+C revealed fictional viable branch/cost=9 feedback; D arrived after that actual
+result. Replanning also records competing unreviewed assessments and the
+operator B0→B1 transition. Alternative branch changes C's synthetic direct value
+14→0. The private adverse evaluator gives static-first A 8 points versus
+information-first B 1 point: a disclosed failure of the information bonus, not
+scientific or worker reward. The final truncated manager abstained with deferred
+while task `blocked` was now ready and still pending. Charter bytes/hash,
+legacy migration export and graph sequence during decision-only writes were
+preserved. Four observations remain unvalidated; actual CPU is null, unused
+LLM/GPU/human costs are zero. Foreign-key check returned no violations.
+Restart inspection retained all decisions, dispatch receipts and evidence.
+
+## Historical authorization and earlier verification logs
+
+The entries below are preserved historical reports; their earlier pending/
+unauthorized statements describe their original documentation updates and do
+not override the verified VS-004 implementation above.
+
 # Current state — VS-003 verified; VS-004 approved, implementation pending
 
 **VS-004 implementation authorization (2026-11-10):** The human owner approved the bounded offline VS-004 task in `tasks/VS-004.md` and V4-11's **same `run-next` interface**: v1–v3 preserve FIFO and exact previous CLI behavior, while explicitly migrated v4 uses Research Manager-ranked dispatch without changing task admission, the worker allowlist or the manual execution trigger (ADR-028–029). ADR-026 forbids treating scientific impact as a fully computable universal score. ADR-027 favors a reusable recommendation across multiple claims, with separately recorded selective and cost-aware replanning instead of automatic expiry on every execution-hash change.
