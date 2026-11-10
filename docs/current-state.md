@@ -1,5 +1,8 @@
 # Current state — VS-004 implemented and verified offline
 
+**Approved post-VS-004 follow-up (2026-11-10; NOT IMPLEMENTED):** ADR-030 requests that the first explicit v4 `run-next` **automatically create/publish an initial Research Manager recommendation** when actual ready work and already registered advisory candidates exist, instead of unconditionally returning `needs_decision / missing`. The approved behavioral boundary and conservative offline test contract are in `tasks/VS-004-followup-initial-ranking.md`. No first-run bootstrap code or new verification has been added by this documentation update. Existing 535-test results below describe the **pre-follow-up** implementation; an empty candidate registry remains non-executing, and no default scientific-impact calculation is authorized. The separate question of whether unranked ready work must block other ranked work (P2) is not resolved.
+
+
 **As of 2026-11-10:** The approved VS-004 task and ADR-024–029 are implemented.
 The final full suite passed **535 tests in 23.85s**, including all 450 original
 regressions and 85 v4 cases. All four offline demonstrations passed in 37
