@@ -205,10 +205,7 @@ request-receipt table for exact batch replay, including requests that insert no
 new candidate versions. This is narrow idempotency storage, not a generic event
 log. Other operation receipts can be stored in their corresponding tables.
 
-An explicit fixture feedback payload is input to estimation only. The dispatcher
-does not interpret synthetic reward, privately held oracle data or prediction
-scores. Dispatch freshness checks actual DB state and the trusted execution
-profile; the exact decision input/configuration hashes remain immutable.
+An explicit fixture feedback payload is input to estimation only. The dispatcher does not treat synthetic rewards or predictor scores as scientific truth. It verifies current readiness and execution profile while a separately recorded Replanning Policy evaluates continuing applicability. Original decision input/configuration hashes remain immutable even after subsequent reuse.
 
 Use composite FKs for decision/member/candidate and study/task references. Bind
 claimed task/run with the existing `(study_id, task_id, run_id)` key; constrain
@@ -319,7 +316,7 @@ improvement nor a regret calculation validates an empirical research policy.
 | Graph interpretation says a prerequisite is satisfied | Ignore it for readiness; use `dependencies` and actual task status |
 | Blocked child ranks first, ready mapped task second | Skip child and dispatch second; record blockers |
 | Only unranked prerequisite is ready | Authoritative ready scan finds P; manager must re-evaluate P or report a recommendation problem, not `no_ready_task`; no silent FIFO promotion |
-| New evidence or unrelated graph correction after publication | Strict stale refusal; obtain an updated manager recommendation automatically at the next explicit decision round |
+| New evidence or unrelated graph correction after publication | Replanning Policy records whether relevant premises changed; reuse may remain valid for unrelated changes, while relevant/unknown critical changes trigger recompute/refusal. A changed global hash alone does not expire a rank |
 | Worker result committed after first ranked claim | Scheduler may reuse **the same recommendation** for a subsequent task only after a recorded relevance/replanning check and current authoritative readiness validation, otherwise replan/refuse |
 | Automatic publication races with dispatch or another publication | Expected-head check plus one write transaction; each dispatch records the selection head actually used |
 | Failure between run insert and dispatch receipt | Whole claim transaction rolls back |
