@@ -25,9 +25,12 @@ from conftest import spec
 from test_validation_cli import cli
 
 
-@pytest.fixture
-def plans(store):
+@pytest.fixture(params=[2, 3], ids=["v2", "v3"])
+def plans(store, request):
     migrate(store)
+    if request.param == 3:
+        from arf.graph_store import migrate as migrate_graph
+        migrate_graph(store)
     return PlanStore(store)
 
 
@@ -549,7 +552,8 @@ def test_b9_migrated_lifecycle_fail_recover_retry_and_guards(plans):
         plans.db.execute("UPDATE studies SET question='overridden'")
 
 
-def test_b9_full_cli_offline_across_processes(tmp_path):
+@pytest.mark.parametrize("cli_version", [2, 3], ids=["cli-v2", "cli-v3"])
+def test_b9_full_cli_offline_across_processes(tmp_path, cli_version):
     from conftest import ROOT
     db = tmp_path / "arf.db"
     cli("init", "--db", db, "--charter", ROOT / "examples/demo-charter.yaml")
@@ -560,6 +564,9 @@ def test_b9_full_cli_offline_across_processes(tmp_path):
     assert cli("plan", "migrate", "--db", db)["status"] == "migrated"
     assert cli("plan", "migrate", "--db", db)["status"] == "already_current"
     with Store(db) as store:
+        if cli_version == 3:
+            from arf.graph_store import migrate as migrate_graph
+            migrate_graph(store)
         assert execution_rows(store) == before
     digest = cli("plan", "export", "--db", db)["context_sha256"]
     result = cli("plan", "propose", "--db", db, "--context", digest, "--request-id", "cli-demo", "--fixture", "task")

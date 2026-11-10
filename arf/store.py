@@ -141,7 +141,7 @@ class Store:
                     for statement in SCHEMA:
                         self.connection.execute(statement)
                     self.connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
-                elif version not in (1, 2):
+                elif version not in (1, 2, 3):
                     raise ARFError(f"unsupported database schema version: {version}")
         except BaseException:
             self.connection.close()

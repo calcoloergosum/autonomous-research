@@ -1,6 +1,172 @@
-# Current state — VS-002 implemented; VS-003 approved for offline implementation
+# Current state — VS-003 implemented and verified offline
 
-**As of 2026-11-10:** VS-003's narrowed Research Graph design (D1–D8) is now **approved for implementation** and recorded as ADR-016–023 in `docs/decisions.md`. The normative scope is `tasks/VS-003.md` (G1–G10), while `tasks/VS-003-proposal.md` preserves non-binding alternatives and extended test ideas. **No VS-003 code, schema v3 migration, tests or research graph has yet been implemented.** VS-005 monitoring/UI and live research remain deferred.
+**As of 2026-11-10:** The approved VS-003 G1–G10 scope and ADR-016–023 are
+implemented. VS-001/VS-002 remain operational on their original schemas and v3.
+The complete regression suite passed: **427 tests in 16.50s**. This is an offline
+engineering fixture, not substantive research or scientific validation. No live
+model/API calls, network requests, spending, new worker kinds, generated-code
+execution, graph CLI/dashboard or deferred research-policy features were added.
+No study charter was modified. The pre-existing untracked `START_HERE_KO.md`,
+`WORKFLOW.md`, and `docs/roadmap.md` were left untouched.
+
+## Implemented VS-003 behavior
+
+- `docs/interfaces-vs003.md` was written before implementation and specifies
+  the internal typed requests, local caller assertions, errors, schema, limits,
+  history and compatibility semantics. Its final text reflects the implementation.
+- `arf/graph_store.py`: explicit, verified, transactional v2→v3 migration;
+  eight graph tables, foreign keys, indexes and append-only guards. V1 requires
+  the existing explicit v1→v2 migration first. Populated migration preserves all
+  legacy rows, including exact charter/context/proposal bytes, hashes, identities,
+  costs/nulls, decisions, receipts and SQLite task sequence. Repeat is a verified
+  no-op; interrupted or unrelated-schema migrations roll back without adoption.
+- `arf/graph_models.py`, `arf/graph.py`: typed local actors and revision-pinned
+  references; explicit valid-note registration; human Q/H and joint synthesis C;
+  six closed semantic edge types; no forged factual edges or objective writes.
+  Exact origin/request/provider/hash/context attribution remains distinct from
+  scientific evidence. Every logical write, revision and immutable operation
+  receipt commits atomically at a monotonically increasing graph sequence.
+- Idea/link corrections and withdrawals append attributed revisions under an
+  expected-head check. Identical operation replay preserves the original receipt
+  without advancing sequence; conflicting reuse fails. Assessments remain scoped
+  and unreviewed. Joint C premises get explicit lineage and never extra experiment
+  or evidence rows. Derivation cycles are refused; other semantic cycles work.
+- Immutable baseline snapshots and scoped operator transitions record reasons,
+  exact E/C motivations and affected task/idea dispositions. Concurrent stale
+  predecessor writes conflict; reversion is another transition. Nothing cancels,
+  starts, retries, rewrites or changes dependencies of existing tasks.
+- `arf/graph_query.py`: consistent bounded reads, typed filters, stable node/edge
+  lookup, ancestry/affected-by traversal, revision history and as-of projections.
+  Original task/run/evidence IDs and successful execution provenance are read
+  from legacy storage. Graph history is historical; legacy execution bodies and
+  factual edges are explicitly labeled current, with historical status unknown.
+  Scoped SUPERSEDES edges derive only from committed operator transitions.
+- `arf/graph_demo.py`: deterministic synthetic scenario with two actual fixed
+  demo executions, a separate approved/imported pending task, registered Q2,
+  branching, competing/convergent assessments, joint C, B0→B1 transition,
+  correction/withdrawal and historical/bounded queries. The fixture requires a
+  fresh path and has a separate restart inspection mode.
+- Compatibility changes are narrow: `Store` accepts schema v3; `PlanStore` accepts
+  v2/v3 without graph fields in context v1. `plan migrate` verifies v3 and keeps
+  its existing `schema_version: 2, status: already_current` planning response;
+  the actual database remains v3. Graph migration is an internal call, not a new
+  public command. The executor, fixed worker, authorization and execution DAG
+  implementation are unchanged.
+
+## VS-003 verification actually observed
+
+Used the existing offline `.venv`: Python 3.12.3, SQLite 3.45.1, PyYAML 6.0.1,
+pytest 9.1.1. No dependency install or network access was performed.
+
+| Command/check | Observed result |
+| --- | --- |
+| `python -m pytest -q` before VS-003 changes | 222 passed in 7.93s |
+| Initial graph acceptance run | 59 passed, 4 failed in 2.90s; inconsistent PlanError/GraphError conversion corrected |
+| `python -m pytest -q` first expanded regression run | 421 passed in 14.83s |
+| `python -m pytest -q tests/test_graph.py` after additional lookup/concurrency/bounds coverage | 68 passed in 2.92s |
+| Final complete `python -m pytest -q` after source changes | **427 passed in 16.50s** |
+| Documented fresh `python -m arf.graph_demo --db PATH` | Exit 0; actual observations and receipts persisted |
+| Separate-process `python -m arf.graph_demo --inspect --db PATH` | Exit 0; sequence, runs, evidence and active baseline retained |
+| Demo `PRAGMA foreign_key_check` | Empty list |
+| `git diff --check` and explicit whitespace inspection of new deliverables | Exit 0 / no whitespace errors |
+
+`tests/test_graph.py` contains 68 acceptance cases covering G1–G10. The existing
+Store-based VS-001 cases now run on v1/v2/v3; the existing planning fixture cases
+run on v2/v3, including the complete separate-process CLI workflow on both
+versions. The final total includes 47 additional execution regressions and
+90 additional planning regressions over the 222-test starting suite. Tests cover
+populated migration and restart, SQLite-authorizer and BaseException rollback,
+unknown/modified schemas, invalid/uncertain/non-note registration, exact pins,
+source-context verification for both notes and imported tasks, failed/interrupted
+run projection, competing evidence, joint premises, append-only history, atomic
+receipt rollback, concurrent head/predecessor conflicts, replay, unchanged legacy
+freshness, inert injection text, operator checks, and all read bounds.
+
+The scale fixture creates **200 hypotheses and 200 motivation links** around one
+real fixed-worker observation. Filtered reads return all 200 within configured
+bounds; smaller reads/traversals visibly report truncation/frontier, including
+candidate-scan exhaustion and zero-depth traversal. Endpoint index selection is
+checked with EXPLAIN QUERY PLAN. No 10,000-node benchmark, hard performance target
+or inferred query timing is claimed.
+
+## Reproducible offline fixture and actual observations
+
+Run the README's VS-003 fixture from the repository root:
+
+```bash
+source .venv/bin/activate
+mkdir -p .local
+graph_demo_dir=$(mktemp -d .local/vs003-verified.XXXXXX)
+python -m arf.graph_demo --db "$graph_demo_dir/arf.db" > "$graph_demo_dir/result.json"
+python -m arf.graph_demo --inspect --db "$graph_demo_dir/arf.db" > "$graph_demo_dir/restarted.json"
+```
+
+The recorded run used `.local/vs003-verified.hqk5S8/arf.db`; the two JSON files
+beside it retain actual outputs/receipts. Reusing that path for build is refused;
+inspection is read-only. Migration preserved every v2 row exactly and repeated
+migration returned already_current. After all graph writes, the legacy context
+remained `bc55e04d17e8ee1417da940c44f83c773bb5ad9862e544fc3f46addb80b2b8b1`.
+No graph operation changed a task, run, observation, approval, receipt or charter.
+
+| Task | Actual result | Measured wall seconds |
+| --- | --- | --- |
+| synthetic-T1 | mean 5.0, count 4 | 0.02084003947675228 |
+| synthetic-T2 | mean 9.0, count 2 | 0.020313862711191177 |
+| planner-demo-d29f9b204dca3546 | Pending; no run/result | Unmeasured |
+
+Exactly two evidence rows remain **unvalidated**. LLM tokens, GPU seconds and
+human minutes are zero; CPU seconds are null/unmeasured. These durations vary
+per run and are observations, not cost predictions. Graph sequence is 20;
+as-of(18) recovers the supporting assessment and still-visible motivation before
+the later correction/withdrawal. Scope `synthetic-comparison` has active baseline
+`baseline-1e7543f2-c39e-4f6e-aed3-724bf8ee65af`, selected by transition 18.
+The low-limit query reported truncated; the normal fixture view did not.
+Separate-process inspection retained all these rows/IDs and the same sequence.
+
+## Reversible assumptions and remaining limitations
+
+- Local Actor roles are trusted assertions, not authenticated users or protection
+  against the filesystem/database owner. Operators can create human ideas and
+  baseline records; recorders can register notes and append interpretations.
+  Neither grants execution approval, evidence review or scientific validation.
+- A registration request is identified by its operation ID. Replay returns that
+  receipt; another operation attempting the same source proposal conflicts and
+  creates no duplicate identity. Immutable original provider/request attribution
+  is stored even if additional identical planning requests are recorded later.
+- Only joint C synthesis is created in this slice (2–64 distinct pinned E/C
+  premises); a general standalone claim authoring/review system is deferred.
+  Default motivation timing is retrospective. Creation-context timing requires
+  the exact original registered/imported proposal and explicit E reference in its
+  envelope and captured context; later idea revisions do not inherit it.
+- The first scoped baseline activation expects no predecessor and requires an
+  existing E/C motivation. A baseline snapshot alone is inactive. Reversion
+  preserves the old transitions; affected dispositions are records, not lifecycle
+  actions. No autonomous selection or impact recalculation exists.
+- Mutations are bounded at 64 KiB canonical request, 4 KiB per text field and
+  64 references. Default read limits are depth 8, 128 nodes, 256 edges and
+  256 KiB; hard maxima are 32/1024/2048/1 MiB. Output has a 1 KiB minimum.
+  Derivation checks refuse writes beyond 1024 visited revisions/2048 candidates.
+  Reads return explicit frontier refs or bounded continuation markers; markers
+  are diagnostic boundaries, not a resumable cursor API. Traversal also bounds
+  examined incident candidates and queued nodes, and reports exhausted scans.
+- As-of does not reconstruct legacy execution status. Current attempts/evidence
+  can appear alongside earlier graph assertions with explicit current/unknown
+  labels. No evidence truth, causation, independent-experiment count, transitive
+  support or final-study conclusion is inferred.
+- SQL guards prevent accidental update/delete; exact JSON references are checked
+  by the trusted service. This is a single-host local SQLite service, not a
+  distributed engine or tamper-resistant archive. Large legacy bodies may be
+  omitted under output bounds with truncation rather than silently shortened.
+- Graph-aware planning contexts, graph-bound task approvals, fine-grained context
+  freshness, formal review/certification, real research, live models, resource
+  policy/scheduling, new workers, generated-code isolation, graph rendering and
+  monitoring remain deferred. Existing VS-002 context v1 is unchanged.
+
+The following sections preserve the earlier implementation/approval record.
+
+## Historical VS-002 implementation and VS-003 approval record
+
+**At the pre-implementation handoff on 2026-11-10:** VS-003's narrowed Research Graph design (D1–D8) is now **approved for implementation** and recorded as ADR-016–023 in `docs/decisions.md`. The normative scope is `tasks/VS-003.md` (G1–G10), while `tasks/VS-003-proposal.md` preserves non-binding alternatives and extended test ideas. **No VS-003 code, schema v3 migration, tests or research graph has yet been implemented.** VS-005 monitoring/UI and live research remain deferred.
 
 VS-002 implements the human-approved B/B/A/A choices
 (ADR-012–015) within `tasks/VS-002.md`. VS-001 remains operational on schema
@@ -283,4 +449,4 @@ The filesystem owner and installed Python/package code are trusted. SQL guards d
 
 The timeout and small output rely on the fixed audited worker. Capturing output is not a general memory sandbox for arbitrary programs. Import size, process memory and total database growth have no configurable quotas in this slice. A forced kill of the controller releases its advisory lock and can leave a child briefly running; that child cannot finalize the DB. Recovery treats its outcome and duration as unknown. The child is side-effect-free, and retry remains explicit; exactly-once execution, orphan-process supervision, distributed leases and full power-loss/storage-corruption recovery are not promised. Lock files must not be removed during operation. The crash test simulates interruption after the durable claim rather than asserting arbitrary machine power-loss behavior.
 
-Deferred human decisions remain unchanged: actual study question/evidence criteria, real budgets and permissions, impact/cost prediction, allocation policy, baseline revision, human working hours, LLM APIs, GPU scheduling and generated-code isolation. The historical VS-002 material above documents the earlier implementation process. As of the current header, VS-002 has been implemented and reviewed; VS-003 is approved for offline implementation but remains unimplemented. There is no live autonomous research deployment.
+Deferred human decisions remain unchanged: actual study question/evidence criteria, real budgets and permissions, impact/cost prediction, allocation policy, baseline revision, human working hours, LLM APIs, GPU scheduling and generated-code isolation. The historical VS-002 material above documents the earlier implementation process. At that earlier handoff, VS-002 had been implemented and reviewed and VS-003 was approved but unimplemented. The new VS-003 implementation and actual verification are recorded at the top of this document. There is no live autonomous research deployment.

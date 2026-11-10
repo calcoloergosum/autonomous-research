@@ -116,8 +116,12 @@ def verify_schema(store: Store, version: int) -> None:
 def migrate(store: Store) -> dict:
     with store.transaction():
         version = store.connection.execute("PRAGMA user_version").fetchone()[0]
-        if version not in (1, 2):
+        if version not in (1, 2, 3):
             raise PlanError("schema", "unsupported database version")
+        if version == 3:
+            from arf.graph_store import verify
+            verify(store, 3)
+            return {"schema_version": 2, "status": "already_current"}
         verify_schema(store, version)
         if version == 2:
             return {"schema_version": 2, "status": "already_current"}
@@ -131,7 +135,7 @@ class PlanStore:
     def __init__(self, store: Store):
         self.store = store
         self.db = store.connection
-        if self.db.execute("PRAGMA user_version").fetchone()[0] != 2:
+        if self.db.execute("PRAGMA user_version").fetchone()[0] not in (2, 3):
             raise PlanError("schema", "planning requires explicit plan migrate")
         # Required objects are verified; extra developer diagnostic triggers are
         # harmless here. Migration itself checks the complete known schema.
