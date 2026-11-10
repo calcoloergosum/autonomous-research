@@ -359,23 +359,3 @@ This design-only document introduces no VS-004 test result.
 
 Human approval of these technical selections is still required before coding. The accepted V4-12/13 principles do **not** authorize live models, task admission changes, background worker triggers, spending or an implemented VS-004.
 
-
-
-Before implementation, approve or amend V4-1–V4-13 and the narrowed choices:
-
-- Separate internal dispatch operation; v4 refusal of legacy FIFO entry points;
-  no public ranked CLI or FIFO override in the initial slice.
-- Strict graph-sequence plus complete-execution freshness, one claim per
-  activation, explicit new round afterward, and accepted liveness/starvation
-  limitations. Multi-claim ranking retention is not implicitly authorized.
-- Operator-only expected-head activation/clear with local trust assertions;
-  no manager auto-activation or authorization delegation.
-- Additive six-table v4 ledger, embedded estimates/configurations, verified
-  compatibility migration and the transaction-owned graph read extraction.
-- Partial-context/truncation and unknown-resource rules; existing fixed-worker
-  execution profile only, with refusal of unsupported hard budget constraints.
-- The synthetic estimator/policy contract, fixture utility/feedback rules,
-  proposed bounds and D1–D13 acceptance matrix in the implementation draft.
-
-The documents prepare reviewable choices. Approval of research direction alone
-does not approve this implementation draft, a study, a budget or a new worker.
