@@ -8,7 +8,7 @@ This is a research systems engineering repository. Before implementation, read `
 - A development milestone is not authorization to start substantive research, spend external funds, make network requests, change unrelated files, or run arbitrary generated code.
 - Keep observations, model predictions, and validated claims distinct. Never fabricate runs, tests, results, or costs.
 - Resource limits are enforced by code, not by trusting an LLM prompt.
-- Execute generated/unknown code only inside explicitly approved isolation; VS-001 permits **only** the included fixed demo experiment, with no arbitrary command input.
+- Execute generated/unknown code only inside explicitly approved isolation. VS-001 and VS-002 authorize **only** the fixed demo experiment; planner text, commands and URLs cannot select execution.
 - A crashed/uncertain run must never be silently counted as successful or automatically rerun when side effects are unknown.
 
 ## Current implementation scope
@@ -17,7 +17,7 @@ This is a research systems engineering repository. Before implementation, read `
 - Python 3.11+ and SQLite; keep external dependencies minimal. PyYAML for charter parsing and pytest for tests are acceptable. No large agent/orchestration framework in VS-001.
 - Favor explicit, testable modules and small, typed functions. Keep storage, execution, and policy interfaces separate so they can evolve later.
 - Preserve evidence and run history; do not mutate or delete observations to make a test pass.
-- Implement deterministic sample experiment + persisted lifecycle. Write tests for normal execution, dependencies, failure, interrupted state, non-duplication, and immutable charter behavior.
+- Preserve the VS-001 deterministic fixed-worker lifecycle and its tests. VS-002 adds proposals and explicit authorization only; no real model calls, automated approval, or new executable worker kinds.
 
 ## Working practice
 
