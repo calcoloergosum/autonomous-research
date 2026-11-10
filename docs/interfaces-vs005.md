@@ -49,7 +49,7 @@ Errors use a fixed envelope and an appropriate HTTP status:
 - `400 invalid_query` or `invalid_id`: unexpected/duplicate parameters, invalid types/length/format or malformed cursor.
 - `404 not_found`: exact stored record absent.
 - `405 method_not_allowed`: non-read methods.
-- `409 unsupported_schema` or `stale_session`: wrong DB version, replaced/restarted observer epoch, or incompatible saved client token.
+- `409 unsupported_schema` or `stale_session`: wrong DB version or a source that cannot be safely reverified/reopened. A well-formed old-epoch poll token against a healthy reverified DB uses **HTTP 200 with `reset_required=true`** as defined below, not a conflicting 409.
 - `413 limit`: query/response object exceeds allowed budget (no silent truncation of exact saved Context).
 - `503 temporarily_unavailable`: SQLite busy/locked or transient source unavailable; client retains a visibly stale view.
 - `500 corrupt_storage`: verified schema cannot safely read expected data; report generic error, not raw SQL/path/traceback to HTTP clients.
@@ -158,7 +158,7 @@ Resolve exactly one saved `research_decisions.decision_id` and its linked **immu
 
 `context` is the exact persisted **original captured input** (including its saved execution snapshot, graph projection, feedback and profile), not reconstructed from today. A Context may have been captured before the associated Decision was created or published; the label **does not** imply the exact instant of execution/claim. `decision` includes **every saved decision member**, policy, source hash and abstention reason. Show as `snapshot_at_decision` with explicit selection/truncation and artificial-policy markers. Null/missing reasoning is not filled with model-generated explanatory text.
 
-The client compares two independently fetched immutable checkpoints by candidate `(candidate_id,version)` and stable idea IDs/revisions. It distinguishes:
+The client **aligns candidates first by stable `candidate_id`**, then treats `version` as a compared field (rather than treating a new version as an unrelated candidate). Graph ideas align by stable idea ID and expose their exact revisions. It distinguishes:
 - membership arrival/departure, new version, order/rank/exclusion changes;
 - changes in declared policy, decision assumptions, feedback, estimated vs observed cost;
 - different selection `roles/edge_types/node/limits`, truncated selections, different graph sequence and original execution hash;
