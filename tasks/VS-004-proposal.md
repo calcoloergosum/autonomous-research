@@ -1,7 +1,7 @@
 # VS-004 proposal — Research Decision Loop with recommendation-guided scheduling
 
 **Status: Proposed; not approved for implementation.** Prepared 2026-11-10 against `main` after VS-003.
-**Authority:** Design proposal only. It does not authorize schema migration, code changes, substantive research, network/model calls, generated-code execution, expenditure, or VS-005 implementation. **The project owner has requested recommendation-guided execution order in VS-004, superseding the earlier advisory-only boundary.** This does **not** authorize bypassing task registration/approval, triggering an unattended run, or implementing the unapproved scheduler contract. Human review of the new claim/dispatch semantics and decisions in section 15 is required before implementation.
+**Authority:** Design proposal only. It does not authorize schema migration, code changes, substantive research, network/model calls, generated-code execution, expenditure, or VS-005 implementation. **The owner has accepted recommendation-ordered execution, automatic Research Manager priority decisions (V4-13 / ADR-024) and independent verification of all ready work without FIFO fallback (V4-12 / ADR-025).** This does **not** authorize bypassing task registration/approval, triggering an unattended run, or implementing the unapproved scheduler contract. Human review of the new claim/dispatch semantics and decisions in section 15 is required before implementation.
 
 ## 1. Purpose and guiding question
 
@@ -186,7 +186,7 @@ A decision record needs:
 - policy name/version, constraints, declared comparison units/weights (if any), deterministic seed for stochastic policies, tie-breaking method;
 - recommended candidate(s), rank/order if meaningful, or explicit `abstain` with reason;
 - decision explanation linked to the factors that actually influenced selection, not an unverified post-hoc rationale;
-- advisory prediction provenance, plus whether the ranked decision was later **activated as a scheduling preference** by a separately trusted controller action; activation is not task authorization;
+- prediction provenance and the trusted controller's **automatic publication** of validated Research Manager priority, distinct from task admission/execution authorization;
 - optional later **evaluation link** to the next decision or observed cost/evidence changes; historical decision bytes never mutate.
 
 Prefer a normalized record that is sufficient to recompute the recommendation from saved inputs without needing the current graph or model network access. If offline estimate values are fixture supplied, store the exact synthetic fixture version and seed. An AI-generated rationale is data, not execution authority.
@@ -195,27 +195,20 @@ Prefer a normalized record that is sufficient to recompute the recommendation fr
 
 **Crash behavior:** prepare inputs and persist a request before invoking any uncertain external provider in future; uncertain results require explicit review rather than hidden replays. For the first purely local deterministic policy, an atomic decision/result/receipt transaction and repeatable tests are enough. Do not introduce network calls or indefinite jobs.
 
-### 8.1. Scheduling: priority selection is not task authorization
+### 8.1. Scheduling: automatic priority is not task authorization
 
-**New VS-004 scope requested by the owner:** replace FIFO with recommendation ordering *for eligible, already-admitted tasks* while keeping the existing fixed worker, transactional claim, retry and recovery invariants.
+**Accepted V4-13:** Research Manager automatically determines/updates priority for existing admitted work, without a person activating each ranking. A trusted controller validates study/charter, versioned recommendation, policy and exact candidate-to-task bindings and persists the effective scheduling preference. Neither ranking nor publication can approve/import a task, start work, retry a failure or choose a worker.
 
-Recommended separation:
+**Accepted V4-12:** The Scheduler must enumerate **all** admitted pending tasks and their real dependency eligibility independently of the ranked subset. It must check whether work is *actually runnable*, not infer an empty ready set from an empty recommendation.
 
-1. **Recommendation:** immutable ranked candidate IDs (including unselected/ineligible candidates), tied to a context, policy and exact verified mappings to existing TaskSpecs where such mappings exist. A recommendation may also explicitly abstain.
-2. **Activation:** the trusted local operator/controller chooses which decision version is an active scheduling preference (or, if explicitly approved later, a delegated policy may activate it). Record who activated which decision, on what state, with an immutable receipt. An untrusted planner response must not set its own scheduling authority.
-3. **Selection:** the scheduler enumerates *pending, dependency-ready, admitted* tasks, intersects with the active rank list, and atomically claims the highest-ranked eligible task. A highly ranked blocked task is **skipped, not run**. Stable tie-breaking and deterministic behavior are required.
-4. **Feedback:** the selected task's existing run/evidence history and measured costs become inputs to the next explicit decision; executing one task does not rewrite past rankings.
+- **No eligible ready tasks:** do not execute; distinguish no pending tasks, dependency blockers and resource/capacity limitations. An unfinished running attempt is a separate busy/recovery state. No-ready does **not** mean the ultimate research question is answered.
+- **Ready tasks exist, but ranking is absent/stale/unusable or omits all of them:** request a **bounded** Research Manager re-evaluation or record `decision_unavailable` with a concrete reason. Do not report `no_ready_task`, retry forever, fabricate new work or fall back to FIFO.
+- **Ready tasks exist, but Research Manager intentionally defers:** preserve a distinct, reasoned abstention/defer decision. No worker starts; this is not the same as a recommendation-generation failure.
+- **Fresh usable recommendation:** intersect its admitted task mappings with the independently verified ready set; skip blocked higher-ranked entries and atomically claim the highest-ranked eligible task using existing execution controls. An unranked ready prerequisite remains discoverable but cannot be run merely because it is ready.
 
-**Freshness race:** the recommended order may have been computed before a task became blocked, completed or retried. Check recommendation binding and actual current task eligibility in the same claim transaction. The system must record whether it used a fresh recommendation, skipped stale/blocked ranked entries, or refused an unsafe dispatch. Recommendation activation does not imply uninterrupted validity. A distinct historical dispatch receipt should link recommendation version, chosen task/run, scheduler version, skipped entries and the effective eligibility/constraint state. Do not duplicate execution facts as scientific evidence.
+The Controller revalidates versioned recommendation/context and actual task eligibility at claim time. Saved priorities, changes and claims need separate provenance and history. Recommendation publication itself **does not trigger unattended execution**. The research manager may continue proposing new subordinate ideas when no executable task is ready, without thereby granting execution rights.
 
-**Unranked eligible tasks, absent or stale decisions, abstention, and newly created ready tasks** need an explicit policy. Two reasonable choices are:
-
-- **Strict recommended-order mode (tentative preference):** when no validated applicable ranking exists, return a non-executing `needs_decision`/equivalent result rather than silently reverting to FIFO. Unranked tasks do not dispatch until ranked or a trusted override is recorded.
-- **Hybrid fallback mode:** rank all known eligible tasks first, then FIFO among unranked tasks; if there is no usable ranking, fall back to FIFO with a visible fallback reason. Maintains liveness but weakens the user's expectation that decisions control dispatch.
-
-Do **not** select either compatibility-impacting fallback implicitly. Preserve the v1–v3 legacy CLI and `run-next` behavior. The VS-004 implementation contract must decide whether the new ranked selection is explicitly opt-in on v4, the default on v4, or exposed through a new dispatch verb; detail how the older interface reports `no_ready_task` versus `needs_decision`. The choice affects public APIs, readiness behavior, and regression tests and must be approved before coding.
-
-The first slice can still use deterministic mock rankings and a trusted activation fixture; no live Research Manager, automatic approvals, resource optimization or unattended worker trigger is required. **It must nevertheless exercise real ranked task claims and fixed-worker execution** so selection ordering is not merely simulated.
+**Still open for approval:** V4-11 exact dispatch entry point; publication-in-decision-transaction versus separate trusted controller call; single-use versus multi-use ranked decisions; freshness granularity and exact result codes. Existing v1–v3 FIFO behavior stays intact; there is no hidden fallback in the new ranked path.
 
 ## 9. Observations, learning and policy updates
 
@@ -269,7 +262,7 @@ The scenario should include:
 - explicit replay and historical decision/activation/dispatch inspection across a process restart;
 - a graph context intentionally truncated, and correct downgrade/abstention rather than unwarranted certainty;
 - several decision rounds with controlled revelation of oracle outcomes, ensuring no future information is leaked into earlier inputs;
-- a trusted activation of the ranked decision followed by **actual existing-worker claims in the recommended order**, with blocked tasks skipped, recorded tie-breaking, one unranked-task case and one stale/abstention case, while preserving legacy FIFO behavior in an older-schema fixture.
+- automatically published manager priority followed by **explicit existing-worker dispatch requests** in the recommended order, with independent full ready-set discovery, blocked tasks skipped, recorded ties, a truly empty ready set, a ready-but-unranked prerequisite, recommendation failure, deliberate abstention and stale-context cases, while preserving older-schema FIFO behavior.
 
 **Critical acceptance principle:** the chosen action need not match a single canned ID in every scenario. The decision must follow its declared policy from recorded inputs; appropriate choices can differ by assumptions. Include adversarial fixtures where the policy's recommendation remains poor to expose limitations rather than overfit a demonstration.
 
@@ -285,7 +278,7 @@ After approval, a minimal VS-004 implementation would include:
 4. A non-adaptive comparator and a parameterized information-aware offline comparator using an explicit, synthetic utility/constraint model.
 5. An append-only decision ledger, replay and decision inspection with immutable context/candidate/policy versions and abstention.
 6. Explicit multi-round re-evaluation with changed input records, offline scenario tests and regression checks proving **zero changes to admission/approval/import, worker execution safety, dependencies or baseline transition authority**.
-7. A **narrow trusted ranked-dispatch path** that activates a versioned recommendation, rechecks ready tasks under the atomic claim boundary, selects the highest-ranked eligible admitted task, records the actual choice, and executes solely via the existing fixed worker. Compare its selections against the legacy FIFO baseline; do not replace the resource scheduler wholesale.
+7. A **narrow trusted ranked-dispatch path** that automatically publishes controller-validated manager priority, **independently enumerates all eligible admitted work**, checks ranking and state under the atomic claim boundary, differentiates genuine no-ready / decision failure / deliberate deferral, records the choice, and uses only the existing fixed worker. Compare with legacy FIFO without implicit fallback or a general scheduler rewrite.
 
 What may be **deferred** from this slice even if useful longer-term: online LLM candidate creation; trained/calibrated real predictor; automatic updating of learned model parameters; live event subscriptions; cross-study learning; general budget exchange rates; stochastic posterior sampling; general POMDP/VOI planning; new human queue; multi-resource capacity scheduling beyond the narrow ready-task selector; a general public Research Manager CLI; UI/VS-005 dashboards.
 
@@ -305,9 +298,9 @@ What may be **deferred** from this slice even if useful longer-term: online LLM 
 | D8 — Observation separation | Actual run costs and unvalidated evidence are not conflated with synthetic oracle reward or real scientific impact. Missing observed costs do not become zero. |
 | D9 — Authority separation | Recommendation **changes ordering of admitted ready tasks only**, through a trusted activation/claim path; it cannot create/approve/import tasks, bypass dependencies/worker allowlists/capacity, activate baselines, trigger unattended execution or retry. Legacy v1–v3 behavior remains unchanged. |
 | D10 — Reliability | Concurrent duplicate/competing decisions, activation conflicts, ranked claims, interrupted writes and restart are tested for atomicity, idempotency and no silent recomputation of uncertain results. Two claimers cannot take one task; the dispatch receipt binds actual task/run identity. |
-| D11 — Offline scenario | Multi-round branching/information update, misleading estimates, cost surprises, an ineligible candidate, blocked high-ranked task, truncated context, abstention, explicit scheduling fallback behavior and adverse-policy counterexample all tested deterministically. |
+| D11 — Offline scenario | Multi-round branching/information update, misleading estimates, costs, blocked high-ranked task, unranked but ready prerequisite independently discovered, genuine no-ready state, recommendation failure versus reasoned deferral, truncated context and adverse-policy counterexample; no FIFO fallback. |
 | D12 — Compatibility | Whole VS-001/002/003 regression suite and existing offline demos continue; any approved migration is explicit, rollback-safe, and preserves all legacy bytes/hash/IDs. Legacy FIFO interfaces on v1–v3 are unaffected; new v4 dispatch/API semantics are reviewed explicitly. |
-| D13 — Ranked dispatch | Given two or more already-admitted ready tasks with ranking opposite to FIFO, an explicit new dispatch call executes the highest-ranked eligible task using the original worker and records the choice. Blocked, failed, absent, stale, wrong-study, unapproved and speculative candidates cannot be claimed via ranking. Absent/stale/partial-ranking behavior follows a reviewed explicit rule, never an undocumented fallback. |
+| D13 — Ranked dispatch | Two admitted ready tasks ranked opposite FIFO are dispatched in manager order **without human per-round activation**. An authoritative scan distinguishes no ready work from ready-but-unranked/failed decision and explicit deferral. Blocked, unapproved, missing, stale or speculative candidates are never claimed; no fallback. |
 
 Tests must verify **behavior**, not merely the number of cases. A synthetic policy comparison is an engineering sanity check; report its failures too. Do not promise scientifically optimal research allocation or production-ready calibration.
 
@@ -342,12 +335,12 @@ The following are **choices for discussion**, not accepted ADRs or instructions 
 | V4-8 | What is the interface/authority? | Internal research decision manager + advisory ledger + **trusted scheduling adapter**; authorization/import remains separate | Direct model-to-dispatch authority (unsafe); graph-bound executable proposal/automation (requires new approval contract) |
 | V4-9 | How to handle partial contexts/unknown costs? | Explicit omissions; allow qualified comparison or abstain under a declared policy, no silent imputations | Strict fail on every partial input (simpler but less useful); silently ignore missing data (unsafe) |
 | V4-10 | What constitutes convincing validation? | Deterministic multi-round synthetic benchmarks with counterexamples plus preservation of old tests | Claims of real scientific effectiveness from fixture metrics (reject) |
-| V4-11 | Which task dispatch interface is authorized? | Ranked dispatch available only on v4 after explicit activation, with original v1–v3 `run-next` behavior preserved | Changing existing `run-next` default across all schemas would break compatibility; a separate command/flag adds an interface |
-| V4-12 | What happens with no usable ranking, blocked/ranked tasks, or abstention? | Strict non-execution when no valid ranking; skip blocked candidates; no silent FIFO fallback | Hybrid FIFO tail/fallback aids liveness but can undermine recommendation order; explicit operator override is another option |
-| V4-13 | Who may activate a recommendation for scheduling? | Trusted local operator/controller only, append-only activation and dispatch audit | Immediate auto-activation by an untrusted manager would weaken execution sequencing authority |
+| V4-11 | Which task dispatch interface is authorized? | New v4 ranked dispatch with **automatic validated manager preference** and original v1–v3 `run-next` preserved | Exact interface and v4 legacy FIFO behavior remain for review |
+| V4-12 **ACCEPTED** | How to distinguish no-ready from no-ranking? | **ADR-025:** independently scan all ready work; truly none means no execution, ready-but-unranked means bounded re-evaluation or recorded decision failure, explicit deferral has its own reason. No FIFO fallback | Exact error codes and bounded reevaluation interface remain open |
+| V4-13 **ACCEPTED** | Who sets execution priority? | **ADR-024:** Research Manager automatically determines order; trusted controller verifies/publishes it, with no per-round human activation and no new task admission/worker authority | Publication atomicity, head conflicts and validity lifetime remain open |
 
-Before approval, decide which aspects of *candidate proposal generation*, *predictor update* and *policy comparison* must be real algorithms versus deliberately simple synthetic seams. **Also settle V4-11–V4-13 explicitly because changing dispatch ordering affects public behavior, execution authority and liveness.** The goal is to exercise one complete recommendation-to-authorized-dispatch-and-feedback loop without prematurely making the system's research policy a hard-coded architectural fact.
+Before approval, decide which candidate-generation, estimator and policy elements are actual algorithms versus synthetic seams. **V4-12 and V4-13 are accepted behavioral principles; V4-11 and the concrete scheduling API/publication/expiry rules remain to be approved.** The goal is to exercise one complete recommendation-to-authorized-dispatch-and-feedback loop without prematurely making the system's research policy a hard-coded architectural fact.
 
 ### Suggested next step
 
-Review V4-1–V4-13 with the human owner. Then turn approved choices into explicit ADRs and a **smaller normative** `tasks/VS-004.md` plus internal interface contract, and only then instruct Codex to implement. The present proposal must **not** be treated as authorization for implementation. The owner's new scheduling direction is recorded here, but the exact API, stale-ranking policy, fallback and activation authority still require review.
+Review remaining V4 choices with the human owner, carrying forward V4-12/V4-13 (ADR-024–025). Then finalize the normative `tasks/VS-004.md` and an internal interface contract before asking Codex to implement. The present proposal must **not** be treated as authorization for implementation. The owner's V4-12/13 direction is recorded here; the exact API, re-evaluation trigger, ranking freshness and controller-publication mechanics still require review.
