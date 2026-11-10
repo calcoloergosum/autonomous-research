@@ -117,7 +117,7 @@ For either storage option, publish the persistence format, uniqueness rules, con
 
 Resource scheduling and budgets beyond local planner input/output bounds; impact/cost prediction; adaptive exploration/exploitation; baseline revision; portfolio optimization; general generated-code execution or sandbox design; live research execution; real-study planning runs; live provider/API calls; credentials, spending and network enablement; new experiment workers; automatic approval/import/run loops; autonomous retry/recovery; evidence promotion; distributed operation; dashboards; full hypothesis/claim graphs and scientific-equivalence deduplication.
 
-## Decisions required before implementation
+## Historical review checklist (resolved or bounded by approved VS-002 task)
 
 - Approve or revise this candidate milestone and its offline fixture-only boundary; no actual study question is supplied by this proposal.
 - Select proposal persistence and migration/reconciliation semantics, including atomic import/provenance and restart tests.
@@ -125,4 +125,4 @@ Resource scheduling and budgets beyond local planner input/output bounds; impact
 - Approve the action union, canonicalization/deduplication rules, local size bounds, strict freshness policy and exact human approval binding. Choose whether non-executable research notes are included or explicitly deferred.
 - Confirm locally trusted operator authorization is sufficient for this demonstration. Stronger identity/authentication is a separate design, not authority that a model can supply.
 
-Human ownership of the study charter, unvalidated evidence labels, the existing worker allowlist and explicit run recovery/retry are invariants, not options being reopened. Once the choices are approved, a separate approved task specification should record them; this proposal alone must not trigger implementation.
+Human ownership of the study charter, unvalidated evidence labels, the existing worker allowlist and explicit run recovery/retry are invariants, not options being reopened. The accepted choices and approved scope are now recorded in `docs/decisions.md` and `tasks/VS-002.md`. This historical proposal alone still does not authorize implementation.
