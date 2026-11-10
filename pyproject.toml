@@ -17,3 +17,6 @@ include = ["arf*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.setuptools.package-data]
+arf = ["observer_schema.json", "observer_assets/index.html", "observer_assets/licenses.txt", "observer_assets/assets/*"]

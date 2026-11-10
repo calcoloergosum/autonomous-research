@@ -1,6 +1,6 @@
 # VS-005 Research Observatory — local read-only HTTP and time contract (v1)
 
-**Status: ACCEPTED CONTRACT FOR BOUNDED VS-005; NOT IMPLEMENTED.**
+**Status: IMPLEMENTED FOR BOUNDED VS-005.** Verification and implementation defaults are recorded in `current-state.md`.
 **Scope:** single-host local read-only observer over a **verified schema-v4** database, with an independently built **React + Vite + strict TypeScript** browser client. The [normative task](../tasks/VS-005.md) controls acceptance; this document defines v1 outward-facing GET contract and how its content must be interpreted.
 **No new v4 schema**, study charter edits, worker, model, allocation policy, research graph edit, task/decision admission, approval or side effects.
 

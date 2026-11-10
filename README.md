@@ -1,6 +1,6 @@
 # Autonomous Research Framework (ARF)
 
-**Status:** VS-001–004 are implemented and verified offline. Explicit schema v4 adds an immutable decision ledger, qualitative impact judgments, synthetic reference policies and selectively reusable ranked dispatch through the existing `run-next`. Schemas v1–v3 retain FIFO. Only the built-in deterministic demo worker executes; autonomous substantive research remains future work.
+**Status:** VS-001–005 are implemented and verified offline. VS-005 adds a local read-only Research Observatory over existing v4 records. Explicit schema v4 adds an immutable decision ledger, qualitative impact judgments, synthetic reference policies and selectively reusable ranked dispatch through the existing `run-next`. Schemas v1–v3 retain FIFO. Only the built-in deterministic demo worker executes; autonomous substantive research remains future work.
 
 ARF is a future system for autonomously managing a potentially unbounded portfolio of research tasks to answer a *human-defined* ultimate research question. It will learn estimates of impact and evidence-acquisition cost, balance exploration and exploitation, schedule limited LLM/compute/human resources, and revise intermediate research baselines without changing the ultimate question.
 
@@ -184,6 +184,46 @@ where the information bonus loses to static order; these payoffs are not
 scientific impact or worker observations. All four observations are unvalidated.
 See current-state for commands, actual measured costs and verification results.
 
+## Local read-only Research Observatory (VS-005)
+
+Open an **existing schema-v4** database. The observer refuses older schemas and
+never migrates, starts a worker, ranks work or acquires the controller lock.
+It serves checked-in React assets with Python's standard library; Node is only
+needed to rebuild the frontend. The UI and all assets stay on loopback.
+
+```bash
+source .venv/bin/activate
+python -m arf.observer --db /path/to/existing-v4.db
+# Prints {"url":"http://127.0.0.1:PORT", ...}; open that URL locally.
+# Ctrl-C stops the observer. Optional --port PORT selects a loopback port.
+```
+
+For a disposable engineering fixture, first run the existing offline demo on a
+fresh path. This explicitly runs the fixed demo workers **before** observation:
+
+```bash
+observer_demo_dir=$(mktemp -d .local/vs005.XXXXXX)
+python -m arf.decision_demo --db "$observer_demo_dir/arf.db" > "$observer_demo_dir/fixture.json"
+python -m arf.observer --db "$observer_demo_dir/arf.db"
+```
+
+Select B to inspect its saved candidate version, all considered alternatives,
+dispatch readiness audit and actual unvalidated Evidence. Pin its Decision
+Context, then use the D dispatch's **Compare context** button. The exact saved
+input, graph revision scope, feedback and original execution snapshot stay
+separate from current execution. An empty ready set is not scientific completion.
+Polling refreshes recent activity every approximately three seconds, preserving
+selection and pinned records. Server restart or source replacement requires an
+explicit recheck; old pinned content remains visibly stale until then.
+
+The five GET resources and limits are specified in
+[interfaces-vs005](docs/interfaces-vs005.md). The first UI shows the first overview
+page and labels additional pages; the API supports bounded keyset pagination.
+Oversized exact records return 413 instead of silently dropping content.
+[Frontend build and browser checks](frontend/README.md) use pinned offline npm
+packages. Assets and their licenses are included via setuptools package data;
+a wheel build still requires the build prerequisites in `pyproject.toml`.
+
 ## Recovery and explicit retry
 
 An interrupted controller leaves its committed attempt `running`. After confirming the previous controller has stopped:
@@ -205,7 +245,7 @@ POSIX advisory locking serializes `run-next` and `recover` on one host; SQLite t
 
 ## Status and work ownership
 
-- This package: VS-001 execution, VS-002 offline planning/authorization/import, VS-003 internal research graph and VS-004 offline decision/ranked dispatch are implemented. See current-state for observed verification results.
+- This package: VS-001 execution, VS-002 offline planning/authorization/import, VS-003 internal research graph, VS-004 offline decision/ranked dispatch and VS-005 local read-only observation are implemented. See current-state for observed verification results.
 - VS-002 implements the approved [task](tasks/VS-002.md) and ADR-012–015. No real research study, live LLM integration, automatic approval, or advanced scheduler is implemented or authorized.
 - Human + ChatGPT: review deviations, decide on public/data interface changes and future milestones.
 

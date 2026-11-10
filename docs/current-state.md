@@ -1,3 +1,147 @@
+# Current state — VS-005 implemented and verified offline (2026-11-11)
+
+The explicitly assigned `prompts/codex-vs005.md` task is implemented on top of
+`6e70dfcde63823962b7d479b2e40c1d3e9609f36`. The final Python suite passed
+**619 tests in 53.24s**: all 561 prior cases plus 58 observer cases. The frontend
+strict typecheck, four runtime/state unit tests, production build and real
+Chromium decision-audit journey passed. These are engineering fixtures, not
+research findings. Existing execution, authorization, policy, graph ownership,
+v1–v4 DDL and study charters were not changed.
+
+## Implemented slice and reversible choices
+
+- `arf/observer.py` is a standalone standard-library entry point:
+  `python -m arf.observer --db EXISTING_V4_PATH`. It binds **127.0.0.1 only**, prints
+  the selected local URL and stops on Ctrl-C. Optional `--port` selects a local
+  port. A serial HTTP server bounds active request handling, with an eight-entry
+  backlog and five-second socket timeout. There are exactly the five approved
+  GET resources; static assets also support HEAD. No write route, controller
+  lock, migration, worker, ranking or recovery path is imported or invoked.
+- `arf/observer_read.py` opens a dedicated SQLite URI with `mode=ro` and
+  `query_only=ON`. It verifies v4 against the checked-in `observer_schema.json`
+  manifest of the existing known DDL, without executing that DDL. Short BEGIN
+  snapshots join exact source IDs. Reads have a one-second SQLite progress
+  budget, bounded row selections and byte ceilings. Query-only observation may
+  interact with SQLite WAL sidecars; it does not write database content.
+- Overview defaults to 20, caps at 50 and uses signed, source/epoch-scoped keyset
+  cursors: task sequence and receipt timestamp/ID order are separate. Trace
+  relations cap at 64; an oversized selection or exact response returns 413,
+  never a silently incomplete record. Two-hop semantic neighborhoods cap at
+  32 visited nodes / 64 edges, with explicit bounded frontier metadata. All
+  decision members, exclusions, null groups, candidate versions and relevant
+  decision/attempt selections remain source-linked. A single receipt can
+  identify an exact recommendation; ambiguous relations are exposed as choices.
+- Original checkpoint Context bytes hash to their stored ID and are returned
+  as the exact parsed captured input, with every saved decision member. Tests
+  also compare its re-encoded bytes to the original persisted canonical bytes.
+  No capture, reconstruction or current policy validation is called by reads.
+  Immutable history, semantic assertions and current execution carry separate
+  temporal labels; missing motivation stays `not_recorded`. Evidence stays
+  `unvalidated`, and synthetic proxy values remain distinct from measured costs.
+- One persistent connection compares **its own** `PRAGMA data_version`; each
+  observed change advances a process-local generation. Path identity changes
+  reopen/reverify the source and roll epoch. Old well-formed tokens get HTTP
+  200/reset_required; unavailable or unsafe sources return explicit errors.
+  Signed overview cursors cannot be carried across sessions or resource kinds.
+- Host/Origin checks, no CORS, no request bodies, bounded IDs/URLs, fixed static
+  allowlist, traversal refusal, CSP, nosniff, no-store and generic JSON errors
+  protect the local HTTP boundary. Raw study text/requests are not logged.
+- `frontend/` contains React 18 + Vite + strict TypeScript, exact pinned
+  dependencies/lockfile and no router, UI kit, graph engine or state package.
+  The UI has recent activity, Why? trace, a persistent Inspector, Live and pinned
+  Decision modes, and two saved checkpoint comparison. It aligns candidate and
+  graph idea identities before comparing versions/revisions; scope differences
+  remain `not_comparable`. Original estimates, observed runs/costs, assumptions,
+  feedback, profiles and selection limits are separately inspectable.
+- Polling runs sequentially about every three seconds and slows in hidden tabs.
+  Abort/ticket and epoch guards reject outdated responses. Live updates retain
+  selection, expansion and Inspector scroll; pinned records and comparison
+  remain unchanged until explicit user action. Restart/replacement/disconnect
+  produces a visible stale/reset state. Explicit source recheck clears all
+  source-specific selections. Failed comparison preserves both existing records.
+- `arf/observer_assets/` contains the checked-in production bundle and dependency
+  licenses; setuptools package-data includes these plus the schema manifest.
+  The observer runtime has no Node, third-party Python, CDN or model dependency.
+  No new schema, stored UI state or deployment was introduced. The visual style
+  is local CSS because the repository had no existing application design system.
+
+## Verification actually executed
+
+All work used existing Python dependencies and npm's local cache, without an
+external registry/model request or dependency download. Fresh fixed-demo workers
+ran only within the existing authorized engineering fixtures. Commands below ran
+from the repository root, or from `frontend/` for npm commands.
+
+| Check | Actual result |
+| --- | --- |
+| Initial read-model tests before implementation | Expected collection failure: observer module did not yet exist |
+| First HTTP/observer expansion | 47 passed, 1 failed: trusted writer printed a nonexistent top-level run_id; fixed its test-only output |
+| Intermediate full suite | 615 passed in 58.92s; then 617 passed in 54.34s after WAL/bounds cases |
+| Final `python -m pytest -q` | **619 passed in 53.24s** |
+| `npm ci --offline --ignore-scripts --no-audit --no-fund` | Passed from exact lockfile, 23 packages installed from cache |
+| Final `npm run typecheck` | Passed, strict TypeScript |
+| Final `npm test` | **4 passed**, runtime decoding, missing/null/invalid data, comparison scope/version and obsolete request guards |
+| Final `npm run build` | Passed, Vite 5.4.21; bundled JS 169.49 kB, CSS 5.69 kB |
+| Final `npm run test:browser` | Passed all eight real-Chromium checks; zero page errors; external requests denied by harness |
+| `python .local/verify_vs004_offline.py` | All four README offline demos/restarts passed: 37 processes, one expected unauthorized-import exit 1 |
+| `PYTHONPATH=. python .local/verify_initial_bootstrap.py` | All seven initial-ranking/restart/replay processes passed; second invocation remained needs_decision/critical_invalidity |
+| Isolated `/usr/bin/python3 -I`, no site packages, PATH=/nonexistent | Served bundled UI and exact checkpoint using copied observer modules/assets; no Node or other ARF services available |
+| `python -c 'from setuptools import setup; setup()' bdist_wheel ...` | **Unavailable:** setuptools is not installed; no wheel build or installation claimed |
+| `git diff --check` | Passed before final staging; final staged check recorded with commit |
+
+The first offline npm resolution could not satisfy an uncached transitive
+nanoid version. Pinned compatible cached postcss/nanoid/rollup overrides resolved
+it, and a fresh offline `npm ci` passed. The initial bootstrap driver initially
+lacked PYTHONPATH; its documented corrected command above passed. A qualitative
+fixture assertion initially expected a null CPU estimate; the actual saved
+record has an empty costs object. The test now verifies that exact missing
+estimate instead of manufacturing a null or zero. Chrome's wrapper returned a
+pageId validation error; the available cached Playwright/Chromium harness supplied
+real browser verification instead. No browser download occurred.
+
+The 58 observer cases cover exact B/candidate/decision/publication/assessment/
+run/evidence joins, exact captured Context, attributed Q/H/semantic revisions,
+missing motivation, bounded graph frontier, multiple interrupted/running attempts,
+empty v4 and initial bootstrap, qualitative exclusions and unranked-ready receipts,
+non-executing abstention, v1–v3 refusal, broken schema/JSON, missing source,
+4,096-byte Unicode and path-like IDs, real oversized output, pagination/cursor
+scope, Host/Origin/method/URL/header limits, SQLite busy/recovery, WAL and actual
+separate-process commits, concurrent polls, server epoch/DB replacement and
+protected file/logical-table equality. Observer import is also tested to load no
+writer, worker, graph service or decision service module.
+
+Final browser artifacts: `.local/vs005-browser.J8YEC7/` contains fresh fixture
+records and desktop/mobile screenshots. It verified live separate-writer updates
+without selection/expansion/scroll loss; writes during pinned comparison; B → D
+comparison and failed comparison retention; disconnect; restart and explicit
+reset; out-of-order A/B requests; keyboard selection and safe stored script text;
+mobile page width; and database path replacement. The development-only writer is
+`tests/observer_writer.py`, never an HTTP endpoint or observer import.
+
+Original demo transcripts/databases: `.local/vs004-verified.imt2179_/` and
+`.local/vs004-initial-verified.by39fr8s/`. V4 workers ran B/A/C/D, with actual wall
+seconds 0.019835349172353745 / 0.01919853873550892 / 0.01927521824836731 /
+0.02102748118340969. All four observations remain unvalidated. The adverse
+synthetic fixture remains static 8 vs information 1 synthetic points, not a
+scientific reward. Charter hashes and foreign-key checks were preserved.
+
+## Limitations and preserved work
+
+The initial UI shows only the first overview page and labels additional pages;
+the API supplies pagination. A trace exceeding its row/byte limits returns 413;
+the graph frontier is diagnostic, not a new graph-expansion endpoint. Checkpoints
+are original captured inputs, not whole-database historical images. Local host
+and filesystem owners remain trusted; multi-user/remote serving, production
+research, new approvals or workers, scientific validation, P2 policy changes and
+full graph navigation remain outside scope. The wheel build/install remains
+unverified until setuptools/wheel build prerequisites are supplied offline.
+
+Pre-existing untracked `START_HERE_KO.md`, `WORKFLOW.md`, `docs/roadmap.md` and
+all prior local databases were preserved. No existing execution/policy module or
+recorded study charter was edited. Earlier reports below remain historical.
+
+---
+
 # Current state — VS-005 specification confirmed, not implemented (2026-11-10)
 
 **Design decision only; no VS-005 source code or new tests have been run as a result of this update.** The human owner confirmed a **read-only, automatically refreshing local Research Observatory** with **React + Vite + strict TypeScript**, focused on **one Task/Dispatch → Why? → Evidence → stored Decision Context → later Decision comparison** journey. The normative engineering specification is [`tasks/VS-005.md`](../tasks/VS-005.md), the bounded HTTP/temporal contract is [`docs/interfaces-vs005.md`](interfaces-vs005.md), the accepted directions are **ADR-031 through ADR-034** in [`docs/decisions.md`](decisions.md), and the separate Codex instructions are [`prompts/codex-vs005.md`](../prompts/codex-vs005.md). The broader [`tasks/VS-005-proposal.md`](../tasks/VS-005-proposal.md) explains tradeoffs but is not an expanded implementation mandate.
